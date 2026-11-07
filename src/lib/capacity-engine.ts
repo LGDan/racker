@@ -186,9 +186,23 @@ export async function getFullInfrastructureSnapshot() {
                   include: {
                     coolingUnits: true,
                     floorTiles: true,
+                    obstructions: true,
                     rows: {
                       include: {
-                        racks: true,
+                        racks: {
+                          include: {
+                            devices: {
+                              select: {
+                                id: true,
+                                name: true,
+                                deviceType: true,
+                                startU: true,
+                                uHeight: true,
+                              },
+                              orderBy: { startU: "asc" },
+                            },
+                          },
+                        },
                       },
                     },
                   },

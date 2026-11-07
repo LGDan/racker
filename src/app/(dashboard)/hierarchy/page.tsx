@@ -62,6 +62,12 @@ interface HierarchySite {
           posY: number;
           surface: string;
         }[];
+        obstructions?: {
+          id: string;
+          posX: number;
+          posY: number;
+          label: string;
+        }[];
         coolingUnits: {
           id: string;
           name: string;
@@ -86,6 +92,13 @@ interface HierarchySite {
             maxPowerWatts: number;
             posX: number;
             posY: number;
+            devices?: {
+              id: string;
+              name: string;
+              deviceType: string;
+              startU: number;
+              uHeight: number;
+            }[];
           }[];
         }[];
       }[];

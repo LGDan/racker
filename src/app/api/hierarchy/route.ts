@@ -17,6 +17,7 @@ export async function GET() {
                 include: {
                   coolingUnits: true,
                   floorTiles: true,
+                  obstructions: true,
                   rows: {
                     include: {
                       racks: true,
@@ -183,6 +184,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: tile });
     }
 
+    if (entityType === "SET_OBSTRUCTION") {
+      const roomId = String(body.roomId || "");
+      const posX = Number(body.posX);
+      const posY = Number(body.posY);
+      const obstructed = body.obstructed === true || body.obstructed === "true";
+      const clear = body.obstructed === false || body.obstructed === "false";
+      if (!obstructed && !clear) {
+        throw new FloorError("obstructed must be true or false");
+      }
+      const tile = await setObstruction(roomId, posX, posY, obstructed);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "SET_OBSTRUCTION",
+          entityType: "FLOOR_OBSTRUCTION",
+          entityId: roomId,
+          details: `${obstructed ? "Marked" : "Cleared"} tile ${posX},${posY} as obstructed`,
+        },
+      });
+      return NextResponse.json({ item: tile });
+    }
+
     if (entityType === "RESIZE_ROOM") {
       const roomId = String(body.roomId || "");
       const gridCols = Number(body.gridCols);
@@ -264,6 +287,7 @@ async function loadRoomLayout(roomId: string) {
     where: { id: roomId },
     include: {
       floorTiles: true,
+      obstructions: true,
       coolingUnits: true,
       powerCircuits: true,
       rows: { include: { racks: true } },
@@ -294,7 +318,10 @@ function rackPlaneOccupied(
       unit.posX === posX &&
       unit.posY === posY
   );
-  return rackHit || coolingHit;
+  const blocked = room.obstructions.some(
+    (tile) => tile.posX === posX && tile.posY === posY
+  );
+  return rackHit || coolingHit || blocked;
 }
 
 async function moveOnFloor(
@@ -313,7 +340,9 @@ async function moveOnFloor(
     const room = await loadRoomLayout(rack.row.roomId);
     assertInGrid(room, posX, posY);
     if (rackPlaneOccupied(room, posX, posY, new Set([id]))) {
-      throw new FloorError("That tile already holds a rack or cooling unit");
+      throw new FloorError(
+        "That tile is obstructed or already holds a rack or cooling unit"
+      );
     }
     return prisma.rack.update({ where: { id }, data: { posX, posY } });
   }
@@ -324,7 +353,9 @@ async function moveOnFloor(
     const room = await loadRoomLayout(unit.roomId);
     assertInGrid(room, posX, posY);
     if (rackPlaneOccupied(room, posX, posY, new Set(), id)) {
-      throw new FloorError("That tile already holds a rack or cooling unit");
+      throw new FloorError(
+        "That tile is obstructed or already holds a rack or cooling unit"
+      );
     }
     return prisma.coolingUnit.update({
       where: { id },
@@ -388,7 +419,7 @@ async function moveOnFloor(
       seen.add(key);
       if (rackPlaneOccupied(room, target.x, target.y, memberIds)) {
         throw new FloorError(
-          "A rack in this row would land on another rack or cooling unit"
+          "A rack in this row would land on an obstructed tile, a rack, or a cooling unit"
         );
       }
     }
@@ -433,6 +464,35 @@ async function setFloorTile(
   });
 }
 
+async function setObstruction(
+  roomId: string,
+  posX: number,
+  posY: number,
+  obstructed: boolean
+) {
+  const room = await loadRoomLayout(roomId);
+  assertInGrid(room, posX, posY);
+  if (!obstructed) {
+    await prisma.floorObstruction.deleteMany({ where: { roomId, posX, posY } });
+    return { roomId, posX, posY, obstructed: false };
+  }
+  const occupied =
+    room.rows.some((row) =>
+      row.racks.some((rack) => rack.posX === posX && rack.posY === posY)
+    ) ||
+    room.coolingUnits.some((unit) => unit.posX === posX && unit.posY === posY);
+  if (occupied) {
+    throw new FloorError(
+      "Move the rack or cooling unit before marking this tile obstructed"
+    );
+  }
+  return prisma.floorObstruction.upsert({
+    where: { roomId_posX_posY: { roomId, posX, posY } },
+    create: { roomId, posX, posY, label: "Obstructed" },
+    update: { label: "Obstructed" },
+  });
+}
+
 async function resizeRoom(roomId: string, gridCols: number, gridRows: number) {
   if (
     !Number.isInteger(gridCols) ||
@@ -469,6 +529,15 @@ async function resizeRoom(roomId: string, gridCols: number, gridRows: number) {
   for (const tile of room.floorTiles) {
     if (tile.posX >= 1 && tile.posY >= 1) {
       placed.push([tile.posX, tile.posY, `grill ${tile.posX},${tile.posY}`]);
+    }
+  }
+  for (const block of room.obstructions) {
+    if (block.posX >= 1 && block.posY >= 1) {
+      placed.push([
+        block.posX,
+        block.posY,
+        `obstruction ${block.posX},${block.posY}`,
+      ]);
     }
   }
   const clipped = placed.find(

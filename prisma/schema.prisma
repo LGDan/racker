@@ -83,6 +83,7 @@ model Room {
   rows               Row[]
   coolingUnits       CoolingUnit[]
   floorTiles         FloorTile[]
+  obstructions       FloorObstruction[]
   powerSources       PowerSource[]
   powerPanels        PowerPanel[]
   powerCircuits      PowerCircuit[]
@@ -96,6 +97,17 @@ model FloorTile {
   posX    Int
   posY    Int
   surface String @default("GRILL") // SOLID | GRILL. Missing rows are solid tiles.
+
+  @@unique([roomId, posX, posY])
+}
+
+model FloorObstruction {
+  id     String @id @default(cuid())
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  posX   Int
+  posY   Int
+  label  String @default("Obstructed")
 
   @@unique([roomId, posX, posY])
 }

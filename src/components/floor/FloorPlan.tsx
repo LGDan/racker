@@ -9,6 +9,14 @@ import { Box, Layers, Pencil } from "lucide-react";
 export type FloorLayer = "UNDERFLOOR" | "FLOOR" | "RACK" | "OVERHEAD";
 export type HeatmapMode = "POWER_KW" | "U_SPACE" | "REDUNDANCY";
 
+export interface FloorDevice {
+  id: string;
+  name: string;
+  deviceType: string;
+  startU: number;
+  uHeight: number;
+}
+
 export interface FloorRack {
   id: string;
   name: string;
@@ -16,6 +24,7 @@ export interface FloorRack {
   totalU: number;
   posX: number;
   posY: number;
+  devices?: FloorDevice[];
 }
 
 export interface FloorRoom {
@@ -23,6 +32,7 @@ export interface FloorRoom {
   gridCols: number;
   gridRows: number;
   floorTiles?: { posX: number; posY: number; surface: string }[];
+  obstructions?: { id: string; posX: number; posY: number; label?: string }[];
   coolingUnits: {
     id: string;
     name: string;
@@ -147,6 +157,9 @@ export function FloorPlan({
       .filter((tile) => tile.surface === "GRILL")
       .map((tile) => cellKey(tile.posX, tile.posY))
   );
+  const obstructions = new Set(
+    (room.obstructions || []).map((tile) => cellKey(tile.posX, tile.posY))
+  );
   const racks = room.rows.flatMap((row) =>
     row.racks.map((rack) => ({ ...rack, rowId: row.id, rowName: row.name }))
   );
@@ -264,6 +277,19 @@ export function FloorPlan({
     });
   }
 
+  async function toggleObstruction(x: number, y: number) {
+    if (!editing || saving || layer !== "RACK") return;
+    const key = cellKey(x, y);
+    if (rackAt.has(key) || coolingAt.has(key)) return;
+    await postLayout({
+      entityType: "SET_OBSTRUCTION",
+      roomId: room.id,
+      posX: x,
+      posY: y,
+      obstructed: !obstructions.has(key),
+    });
+  }
+
   async function shiftElevation(socket: FloorSocket) {
     const elevation = socket.elevation === "OVERHEAD" ? "UNDERFLOOR" : "OVERHEAD";
     await postLayout({
@@ -371,6 +397,16 @@ export function FloorPlan({
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
+              className="w-3 h-3 rounded-sm border border-slate-400"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(-45deg, #94a3b8 0 1px, #334155 1px 3px)",
+              }}
+            />
+            Obstructed
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
               className="w-3 h-3 rounded-sm border border-cyan-400"
               style={{
                 backgroundImage:
@@ -438,6 +474,7 @@ export function FloorPlan({
                     const x = colIndex + 1;
                     const key = cellKey(x, y);
                     const grill = grills.has(key);
+                    const blocked = obstructions.has(key);
                     const rack = rackAt.get(key);
                     const cooling = coolingAt.get(key);
                     const row = rowAt.get(key);
@@ -458,16 +495,22 @@ export function FloorPlan({
                     const targeted =
                       hover?.x === x && hover?.y === y && draggingId != null;
                     const floorFocus = layer === "FLOOR";
+                    const rackFocus = layer === "RACK";
                     return (
                       <div
                         key={key}
-                        onClick={() => void toggleGrill(x, y)}
+                        onClick={() => {
+                          if (floorFocus) void toggleGrill(x, y);
+                          else if (rackFocus) void toggleObstruction(x, y);
+                        }}
                         className={`relative rounded-md border overflow-hidden ${
                           targeted
                             ? "border-cyan-300 ring-2 ring-cyan-300"
                             : "border-slate-800"
                         } ${
-                          editing && floorFocus ? "cursor-pointer" : ""
+                          editing && (floorFocus || (rackFocus && !rack && !cooling))
+                            ? "cursor-pointer"
+                            : ""
                         }`}
                         style={{
                           background: grill
@@ -478,8 +521,24 @@ export function FloorPlan({
                             ? "#0f172a"
                             : "#020617",
                         }}
-                        aria-label={`Tile ${x},${y}${grill ? " grill" : " solid"}`}
+                        aria-label={`Tile ${x},${y}${blocked ? " obstructed" : ""}${
+                          grill ? " grill" : " solid"
+                        }`}
                       >
+                        {blocked && (
+                          <div
+                            className={`absolute inset-0 z-[5] flex items-end justify-center pb-1 text-[9px] font-bold tracking-wide text-slate-100 ${
+                              rackFocus ? "" : "opacity-40"
+                            } pointer-events-none`}
+                            style={{
+                              backgroundImage: rackFocus
+                                ? "repeating-linear-gradient(-45deg, rgba(148,163,184,0.95) 0 3px, rgba(30,41,59,0.96) 3px 8px)"
+                                : "repeating-linear-gradient(-45deg, rgba(148,163,184,0.45) 0 2px, transparent 2px 7px)",
+                            }}
+                          >
+                            {rackFocus ? "BLOCKED" : ""}
+                          </div>
+                        )}
                         {rack && layer !== "RACK" && (
                           <div className="absolute inset-1 rounded border border-cyan-400/30 text-[9px] text-cyan-200/50 flex items-center justify-center pointer-events-none">
                             {rack.code}
@@ -511,6 +570,7 @@ export function FloorPlan({
                               }
                               className="absolute inset-1 rounded px-1 py-2 text-center cursor-grab active:cursor-grabbing z-10"
                               style={{ background: rackColors[rack.id] }}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <div className="text-[11px] font-bold text-slate-950 leading-tight">
                                 {rack.code}
@@ -521,6 +581,7 @@ export function FloorPlan({
                               href={`/racks/${rack.id}`}
                               className="absolute inset-1 rounded px-1 py-2 text-center z-10 hover:brightness-110"
                               style={{ background: rackColors[rack.id] }}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <div className="text-[11px] font-bold text-slate-950 leading-tight">
                                 {rack.code}
@@ -538,6 +599,7 @@ export function FloorPlan({
                             className={`absolute inset-1 rounded bg-sky-400/80 text-slate-950 text-[10px] font-semibold px-1 py-1 z-10 ${
                               canDragRack ? "cursor-grab" : ""
                             }`}
+                            onClick={(event) => event.stopPropagation()}
                           >
                             {cooling.unitType}
                           </div>
@@ -553,6 +615,7 @@ export function FloorPlan({
                               canDragRack ? "cursor-grab" : "pointer-events-none"
                             }`}
                             title={row.name}
+                            onClick={(event) => event.stopPropagation()}
                           >
                             {row.name}
                           </button>
@@ -571,6 +634,7 @@ export function FloorPlan({
                                   ? "bg-purple-400/90 text-slate-950"
                                   : "bg-amber-400/90 text-slate-950"
                               } ${editing ? "cursor-grab" : ""}`}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <div className="truncate">{socket.floorSocketLabel}</div>
                               <div className="opacity-80">
@@ -648,7 +712,7 @@ export function FloorPlan({
               ? "Click a tile to toggle a solid slab and an airflow grill."
               : socketLayer
               ? "Drag a socket on this elevation, or send it to the other plane."
-              : "Drag a rack, a cooling unit, or a row label. Sockets and grills stay put."}
+              : "Drag a rack, a cooling unit, or a row label. Click an empty tile to mark it obstructed."}
           </span>
         </form>
       )}
