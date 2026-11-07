@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
+  Handle,
   MiniMap,
+  Position,
   ReactFlow,
   type Edge,
   type Node,
@@ -77,10 +79,12 @@ interface Cable {
 
 function InfraNode({ data }: { data: { title: string; subtitle: string; tone: string; kind: string } }) {
   return (
-    <div className={`min-w-[190px] rounded-lg border px-3 py-2 text-xs shadow-lg ${data.tone}`}>
+    <div className={`relative min-w-[190px] rounded-lg border px-3 py-2 text-xs shadow-lg ${data.tone}`}>
+      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-slate-950 !bg-slate-300" />
       <div className="text-[10px] font-bold uppercase tracking-wider opacity-70">{data.kind}</div>
       <div className="font-semibold text-white">{data.title}</div>
       <div className="mt-0.5 text-[11px] text-slate-200">{data.subtitle}</div>
+      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-slate-950 !bg-slate-300" />
     </div>
   );
 }
@@ -273,6 +277,7 @@ export function LayeredVisualizer() {
             edges={graph.edges}
             nodeTypes={nodeTypes}
             fitView
+            defaultEdgeOptions={{ style: { stroke: "#94a3b8", strokeWidth: 1.75 } }}
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#1e293b" gap={18} />
@@ -544,7 +549,12 @@ function spatialGraph(snap: {
         position: { x: 260, y: by },
         data: { kind: "Building", title: b.name, subtitle: `${b.floors.length} floors`, tone: "border-slate-600 bg-slate-900" },
       });
-      edges.push({ id: `${site.id}-${b.id}`, source: site.id, target: b.id });
+      edges.push({
+        id: `${site.id}-${b.id}`,
+        source: site.id,
+        target: b.id,
+        style: { stroke: "#67e8f9", strokeWidth: 1.75 },
+      });
       b.floors.forEach((f) => {
         f.rooms.forEach((room) => {
           const racks = room.rows.flatMap((row) => row.racks);
@@ -559,7 +569,12 @@ function spatialGraph(snap: {
               tone: "border-slate-600 bg-slate-900",
             },
           });
-          edges.push({ id: `${b.id}-${room.id}`, source: b.id, target: room.id });
+          edges.push({
+            id: `${b.id}-${room.id}`,
+            source: b.id,
+            target: room.id,
+            style: { stroke: "#94a3b8", strokeWidth: 1.75 },
+          });
           y += 110;
         });
       });

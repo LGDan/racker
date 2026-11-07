@@ -741,28 +741,6 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-4">
           <div className="relative mx-auto" style={{ width: 820, height: stageH }}>
-            <svg className="pointer-events-none absolute inset-0 h-full w-full">
-              {mode === "power" &&
-                face === "REAR" &&
-                powerLinks.map((link) => {
-                  const outletPos = outletPosition(rack, link.outletId, leftPdus, rightPdus);
-                  const devPos = deviceAnchor(rack, link.device, link.psu.id);
-                  if (!outletPos || !devPos) return null;
-                  const color = link.feed === "A" ? "#3b82f6" : "#f59e0b";
-                  const mid = (outletPos.x + devPos.x) / 2;
-                  return (
-                    <path
-                      key={link.psu.id}
-                      d={`M ${outletPos.x} ${outletPos.y} C ${mid} ${outletPos.y}, ${mid} ${devPos.y}, ${devPos.x} ${devPos.y}`}
-                      stroke={color}
-                      strokeWidth={selectedPsuId === link.psu.id ? 3 : 1.6}
-                      fill="none"
-                      opacity={0.85}
-                    />
-                  );
-                })}
-            </svg>
-
             <div
               className="absolute rounded-md border-2 border-slate-600 bg-gradient-to-b from-slate-800 to-slate-900"
               style={{ left: RACK_X, top: 28, width: RACK_W, height: rack.totalU * U_H }}
@@ -842,6 +820,33 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
               selectedPsu={selectedPsu}
               onOutlet={connectOutlet}
             />
+
+            <svg className="pointer-events-none absolute inset-0 z-20 h-full w-full">
+              {mode === "power" &&
+                face === "REAR" &&
+                powerLinks.map((link) => {
+                  const outletPos = outletPosition(rack, link.outletId, leftPdus, rightPdus);
+                  const devPos = deviceAnchor(rack, link.device, link.psu.id, link.feed);
+                  if (!outletPos || !devPos) return null;
+                  const color = link.feed === "A" ? "#3b82f6" : "#f59e0b";
+                  const mid = (outletPos.x + devPos.x) / 2;
+                  const d = `M ${outletPos.x} ${outletPos.y} C ${mid} ${outletPos.y}, ${mid} ${devPos.y}, ${devPos.x} ${devPos.y}`;
+                  const active = selectedPsuId === link.psu.id;
+                  return (
+                    <g key={link.psu.id}>
+                      <path d={d} stroke="#020617" strokeWidth={active ? 6 : 4.5} fill="none" strokeLinecap="round" />
+                      <path
+                        d={d}
+                        stroke={color}
+                        strokeWidth={active ? 3 : 2.2}
+                        fill="none"
+                        strokeLinecap="round"
+                      />
+                      <circle cx={devPos.x} cy={devPos.y} r={active ? 5 : 4} fill={color} stroke="#020617" strokeWidth={1.5} />
+                    </g>
+                  );
+                })}
+            </svg>
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-2">
             {rack.pdus.map((pdu) => {
@@ -1138,13 +1143,13 @@ function suggestStart(rack: Rack, uHeight: number) {
   return 1;
 }
 
-function deviceAnchor(rack: Rack, device: Device, psuId: string) {
+function deviceAnchor(rack: Rack, device: Device, psuId: string, feed: string) {
   const idx = Math.max(0, device.psus.findIndex((p) => p.id === psuId));
   const top = 28 + (rack.totalU - (device.startU + device.uHeight - 1)) * U_H;
-  return {
-    x: RACK_X + RACK_W / 2,
-    y: top + 10 + idx * 8,
-  };
+  const faceHeight = device.uHeight * U_H;
+  const y = top + Math.min(faceHeight - 6, 10 + idx * 8);
+  const x = feed === "B" ? RACK_X + RACK_W - 36 : RACK_X + 36;
+  return { x, y };
 }
 
 function outletPosition(rack: Rack, outletId: string, left: Pdu[], right: Pdu[]) {
