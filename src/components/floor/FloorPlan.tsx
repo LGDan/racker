@@ -157,8 +157,8 @@ export function FloorPlan({
       .filter((tile) => tile.surface === "GRILL")
       .map((tile) => cellKey(tile.posX, tile.posY))
   );
-  const obstructions = new Set(
-    (room.obstructions || []).map((tile) => cellKey(tile.posX, tile.posY))
+  const obstructions = new Map(
+    (room.obstructions || []).map((tile) => [cellKey(tile.posX, tile.posY), tile])
   );
   const racks = room.rows.flatMap((row) =>
     row.racks.map((rack) => ({ ...rack, rowId: row.id, rowName: row.name }))
@@ -527,7 +527,7 @@ export function FloorPlan({
                       >
                         {blocked && (
                           <div
-                            className={`absolute inset-0 z-[5] flex items-end justify-center pb-1 text-[9px] font-bold tracking-wide text-slate-100 ${
+                            className={`absolute inset-0 z-[5] flex items-end justify-center px-1 pb-1 text-[9px] font-bold tracking-wide text-slate-100 truncate ${
                               rackFocus ? "" : "opacity-40"
                             } pointer-events-none`}
                             style={{
@@ -536,7 +536,9 @@ export function FloorPlan({
                                 : "repeating-linear-gradient(-45deg, rgba(148,163,184,0.45) 0 2px, transparent 2px 7px)",
                             }}
                           >
-                            {rackFocus ? "BLOCKED" : ""}
+                            {rackFocus
+                              ? obstructions.get(key)?.label || "BLOCKED"
+                              : ""}
                           </div>
                         )}
                         {rack && layer !== "RACK" && (

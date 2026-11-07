@@ -12,6 +12,7 @@ import {
   BarChart3,
   Users,
   LogOut,
+  Settings2,
   ShieldCheck,
   UserCheck,
   HardDrive,
@@ -72,6 +73,12 @@ export function AppShell({ user, firstRackId, children }: AppShellProps) {
   ];
 
   if (user.role === "ADMIN") {
+    navItems.push({
+      label: "System Management",
+      href: "/admin/system",
+      icon: Settings2,
+      active: pathname.startsWith("/admin/system"),
+    });
     navItems.push({
       label: "Users & RBAC Audit",
       href: "/admin/users",
