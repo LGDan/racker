@@ -338,6 +338,17 @@ async function main() {
     ],
   });
 
+  await prisma.floorTile.createMany({
+    data: [3, 5, 7].flatMap((posX) =>
+      [4, 5].map((posY) => ({
+        roomId: roomHall1.id,
+        posX,
+        posY,
+        surface: "GRILL",
+      }))
+    ),
+  });
+
   // Upstream Power Infrastructure (Utility -> Generator -> ATS -> UPS -> 3-Phase Panels)
   const utilityA = await prisma.powerSource.create({
     data: {

@@ -185,6 +185,7 @@ export async function getFullInfrastructureSnapshot() {
                 rooms: {
                   include: {
                     coolingUnits: true,
+                    floorTiles: true,
                     rows: {
                       include: {
                         racks: true,

@@ -4,19 +4,19 @@ overview: Replace the hierarchy page’s stacked rack cards with a four-layer 60
 todos:
   - id: floor-grid
     content: Render the selected room as a tile grid with Underfloor, Floor, Rack, and Overhead layers. Floor tiles can be solid or grill. Racks and cooling share the rack plane.
-    status: pending
+    status: completed
   - id: move-api
     content: Add PowerCircuit.elevation, FloorTile grills, and admin MOVE_ON_FLOOR, SET_FLOOR_TILE, and RESIZE_ROOM. Occupancy is per layer.
-    status: pending
+    status: completed
   - id: edit-mode
     content: "Add the admin-only Edit layout toggle: drag objects on the active layer, toggle grills, drag a row, and resize the room grid"
-    status: pending
+    status: completed
   - id: view-3d
     content: Add a Three.js room view that stacks underfloor sockets, grill tiles, racks, and overhead sockets from the same coordinates
-    status: pending
+    status: completed
   - id: verify-floor
     content: Verify the 2D layers, a grill toggle, an admin drag, and the 3D room in the browser
-    status: pending
+    status: completed
 isProject: false
 ---
 

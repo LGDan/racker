@@ -82,10 +82,22 @@ model Room {
   gridRows           Int            @default(10)
   rows               Row[]
   coolingUnits       CoolingUnit[]
+  floorTiles         FloorTile[]
   powerSources       PowerSource[]
   powerPanels        PowerPanel[]
   powerCircuits      PowerCircuit[]
   createdAt          DateTime       @default(now())
+}
+
+model FloorTile {
+  id      String @id @default(cuid())
+  roomId  String
+  room    Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  posX    Int
+  posY    Int
+  surface String @default("GRILL") // SOLID | GRILL. Missing rows are solid tiles.
+
+  @@unique([roomId, posX, posY])
 }
 
 model CoolingUnit {
@@ -195,6 +207,7 @@ model PowerCircuit {
   voltageV         Int       @default(230)
   socketType       String    @default("IEC_60309_32A_1P") // IEC_60309_32A_1P | IEC_60309_32A_3P | IEC_60309_63A_3P | NEMA_L6_30R
   status           String    @default("ONLINE") // ONLINE | TRIPPED | OFF
+  elevation        String    @default("UNDERFLOOR") // UNDERFLOOR | OVERHEAD
   posX             Int       @default(1)
   posY             Int       @default(1)
   pdus             RackPdu[]

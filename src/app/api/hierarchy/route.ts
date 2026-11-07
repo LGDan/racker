@@ -13,9 +13,10 @@ export async function GET() {
           floors: {
             orderBy: { levelNumber: "asc" },
             include: {
-              rooms: {
+                rooms: {
                 include: {
                   coolingUnits: true,
+                  floorTiles: true,
                   rows: {
                     include: {
                       racks: true,
@@ -144,6 +145,61 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: created });
     }
 
+    if (entityType === "MOVE_ON_FLOOR") {
+      const kind = String(body.kind || "");
+      const id = String(body.id || "");
+      const posX = Number(body.posX);
+      const posY = Number(body.posY);
+      const moved = await moveOnFloor(kind, id, posX, posY, body.elevation);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "MOVE_ON_FLOOR",
+          entityType: kind,
+          entityId: id,
+          details: `Moved ${kind} to tile ${posX},${posY}${
+            body.elevation ? ` (${body.elevation})` : ""
+          }`,
+        },
+      });
+      return NextResponse.json({ item: moved });
+    }
+
+    if (entityType === "SET_FLOOR_TILE") {
+      const roomId = String(body.roomId || "");
+      const posX = Number(body.posX);
+      const posY = Number(body.posY);
+      const surface = String(body.surface || "");
+      const tile = await setFloorTile(roomId, posX, posY, surface);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "SET_FLOOR_TILE",
+          entityType: "FLOOR_TILE",
+          entityId: roomId,
+          details: `Set tile ${posX},${posY} to ${surface}`,
+        },
+      });
+      return NextResponse.json({ item: tile });
+    }
+
+    if (entityType === "RESIZE_ROOM") {
+      const roomId = String(body.roomId || "");
+      const gridCols = Number(body.gridCols);
+      const gridRows = Number(body.gridRows);
+      const room = await resizeRoom(roomId, gridCols, gridRows);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "RESIZE_ROOM",
+          entityType: "ROOM",
+          entityId: roomId,
+          details: `Resized room grid to ${gridCols}×${gridRows}`,
+        },
+      });
+      return NextResponse.json({ item: room });
+    }
+
     if (entityType === "DELETE") {
       const { targetType, id } = body;
       if (targetType === "SITE") await prisma.site.delete({ where: { id } });
@@ -165,12 +221,266 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: unknown) {
     console.error("Hierarchy mutation error:", err);
+    const status = err instanceof FloorError ? err.status : 500;
     return NextResponse.json(
       {
         error:
           err instanceof Error ? err.message : "Failed to mutate hierarchy",
       },
-      { status: 500 }
+      { status }
     );
   }
+}
+
+class FloorError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function assertInGrid(
+  room: { gridCols: number; gridRows: number },
+  x: number,
+  y: number
+) {
+  if (
+    !Number.isInteger(x) ||
+    !Number.isInteger(y) ||
+    x < 1 ||
+    y < 1 ||
+    x > room.gridCols ||
+    y > room.gridRows
+  ) {
+    throw new FloorError(
+      `Tile ${x},${y} is outside the ${room.gridCols}×${room.gridRows} room`
+    );
+  }
+}
+
+async function loadRoomLayout(roomId: string) {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      floorTiles: true,
+      coolingUnits: true,
+      powerCircuits: true,
+      rows: { include: { racks: true } },
+    },
+  });
+  if (!room) throw new FloorError("Room not found", 404);
+  return room;
+}
+
+function rackPlaneOccupied(
+  room: Awaited<ReturnType<typeof loadRoomLayout>>,
+  posX: number,
+  posY: number,
+  ignoreRackIds: Set<string>,
+  ignoreCoolingId?: string
+) {
+  const rackHit = room.rows.some((row) =>
+    row.racks.some(
+      (rack) =>
+        !ignoreRackIds.has(rack.id) &&
+        rack.posX === posX &&
+        rack.posY === posY
+    )
+  );
+  const coolingHit = room.coolingUnits.some(
+    (unit) =>
+      unit.id !== ignoreCoolingId &&
+      unit.posX === posX &&
+      unit.posY === posY
+  );
+  return rackHit || coolingHit;
+}
+
+async function moveOnFloor(
+  kind: string,
+  id: string,
+  posX: number,
+  posY: number,
+  elevation?: unknown
+) {
+  if (kind === "RACK") {
+    const rack = await prisma.rack.findUnique({
+      where: { id },
+      include: { row: true },
+    });
+    if (!rack) throw new FloorError("Rack not found", 404);
+    const room = await loadRoomLayout(rack.row.roomId);
+    assertInGrid(room, posX, posY);
+    if (rackPlaneOccupied(room, posX, posY, new Set([id]))) {
+      throw new FloorError("That tile already holds a rack or cooling unit");
+    }
+    return prisma.rack.update({ where: { id }, data: { posX, posY } });
+  }
+
+  if (kind === "COOLING_UNIT") {
+    const unit = await prisma.coolingUnit.findUnique({ where: { id } });
+    if (!unit) throw new FloorError("Cooling unit not found", 404);
+    const room = await loadRoomLayout(unit.roomId);
+    assertInGrid(room, posX, posY);
+    if (rackPlaneOccupied(room, posX, posY, new Set(), id)) {
+      throw new FloorError("That tile already holds a rack or cooling unit");
+    }
+    return prisma.coolingUnit.update({
+      where: { id },
+      data: { posX, posY },
+    });
+  }
+
+  if (kind === "FLOOR_SOCKET") {
+    const circuit = await prisma.powerCircuit.findUnique({ where: { id } });
+    if (!circuit) throw new FloorError("Floor socket not found", 404);
+    const room = await loadRoomLayout(circuit.roomId);
+    assertInGrid(room, posX, posY);
+    const nextElevation =
+      elevation == null || elevation === ""
+        ? circuit.elevation
+        : String(elevation);
+    if (nextElevation !== "UNDERFLOOR" && nextElevation !== "OVERHEAD") {
+      throw new FloorError("Elevation must be UNDERFLOOR or OVERHEAD");
+    }
+    const occupied = room.powerCircuits.some(
+      (other) =>
+        other.id !== id &&
+        other.posX === posX &&
+        other.posY === posY &&
+        other.elevation === nextElevation
+    );
+    if (occupied) {
+      throw new FloorError(
+        "That tile already holds a socket at the same elevation"
+      );
+    }
+    return prisma.powerCircuit.update({
+      where: { id },
+      data: { posX, posY, elevation: nextElevation },
+    });
+  }
+
+  if (kind === "ROW") {
+    const row = await prisma.row.findUnique({
+      where: { id },
+      include: { racks: true },
+    });
+    if (!row) throw new FloorError("Row not found", 404);
+    const room = await loadRoomLayout(row.roomId);
+    assertInGrid(room, posX, posY);
+    const dx = posX - row.gridX;
+    const dy = posY - row.gridY;
+    const memberIds = new Set(row.racks.map((rack) => rack.id));
+    const next = row.racks.map((rack) => ({
+      id: rack.id,
+      x: rack.posX + dx,
+      y: rack.posY + dy,
+    }));
+    const seen = new Set<string>();
+    for (const target of next) {
+      assertInGrid(room, target.x, target.y);
+      const key = `${target.x},${target.y}`;
+      if (seen.has(key)) {
+        throw new FloorError("Racks in this row would overlap each other");
+      }
+      seen.add(key);
+      if (rackPlaneOccupied(room, target.x, target.y, memberIds)) {
+        throw new FloorError(
+          "A rack in this row would land on another rack or cooling unit"
+        );
+      }
+    }
+    await prisma.$transaction([
+      prisma.row.update({
+        where: { id },
+        data: { gridX: posX, gridY: posY },
+      }),
+      ...next.map((target) =>
+        prisma.rack.update({
+          where: { id: target.id },
+          data: { posX: target.x, posY: target.y },
+        })
+      ),
+    ]);
+    return prisma.row.findUnique({ where: { id }, include: { racks: true } });
+  }
+
+  throw new FloorError("Unknown floor move");
+}
+
+async function setFloorTile(
+  roomId: string,
+  posX: number,
+  posY: number,
+  surface: string
+) {
+  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  if (!room) throw new FloorError("Room not found", 404);
+  assertInGrid(room, posX, posY);
+  if (surface === "SOLID") {
+    await prisma.floorTile.deleteMany({ where: { roomId, posX, posY } });
+    return { roomId, posX, posY, surface: "SOLID" };
+  }
+  if (surface !== "GRILL") {
+    throw new FloorError("Surface must be SOLID or GRILL");
+  }
+  return prisma.floorTile.upsert({
+    where: { roomId_posX_posY: { roomId, posX, posY } },
+    create: { roomId, posX, posY, surface: "GRILL" },
+    update: { surface: "GRILL" },
+  });
+}
+
+async function resizeRoom(roomId: string, gridCols: number, gridRows: number) {
+  if (
+    !Number.isInteger(gridCols) ||
+    !Number.isInteger(gridRows) ||
+    gridCols < 1 ||
+    gridRows < 1 ||
+    gridCols > 40 ||
+    gridRows > 40
+  ) {
+    throw new FloorError("Room size must be between 1 and 40 tiles");
+  }
+  const room = await loadRoomLayout(roomId);
+  const placed: Array<[number, number, string]> = [];
+  for (const row of room.rows) {
+    if (row.gridX >= 1 && row.gridY >= 1) {
+      placed.push([row.gridX, row.gridY, `row ${row.name}`]);
+    }
+    for (const rack of row.racks) {
+      if (rack.posX >= 1 && rack.posY >= 1) {
+        placed.push([rack.posX, rack.posY, `rack ${rack.code}`]);
+      }
+    }
+  }
+  for (const unit of room.coolingUnits) {
+    if (unit.posX >= 1 && unit.posY >= 1) {
+      placed.push([unit.posX, unit.posY, unit.name]);
+    }
+  }
+  for (const socket of room.powerCircuits) {
+    if (socket.posX >= 1 && socket.posY >= 1) {
+      placed.push([socket.posX, socket.posY, socket.floorSocketLabel]);
+    }
+  }
+  for (const tile of room.floorTiles) {
+    if (tile.posX >= 1 && tile.posY >= 1) {
+      placed.push([tile.posX, tile.posY, `grill ${tile.posX},${tile.posY}`]);
+    }
+  }
+  const clipped = placed.find(
+    ([x, y]) => x > gridCols || y > gridRows || x < 1 || y < 1
+  );
+  if (clipped) {
+    throw new FloorError(
+      `New size would clip ${clipped[2]} at ${clipped[0]},${clipped[1]}`
+    );
+  }
+  return prisma.room.update({
+    where: { id: roomId },
+    data: { gridCols, gridRows },
+  });
 }

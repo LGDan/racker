@@ -6,15 +6,10 @@ import {
   Building2,
   Plus,
   Server,
-  ThermometerSnowflake,
-  PlugZap,
   ChevronRight,
-  Layers,
   ShieldAlert,
-  ArrowUpRight,
-  Flame,
-  CheckCircle2,
 } from "lucide-react";
+import { FloorPlan } from "@/components/floor/FloorPlan";
 
 interface RackSummary {
   id: string;
@@ -61,6 +56,12 @@ interface HierarchySite {
         ambientTempTargetC: number;
         gridCols: number;
         gridRows: number;
+        floorTiles?: {
+          id: string;
+          posX: number;
+          posY: number;
+          surface: string;
+        }[];
         coolingUnits: {
           id: string;
           name: string;
@@ -73,6 +74,7 @@ interface HierarchySite {
         rows: {
           id: string;
           name: string;
+          orientation: string;
           aisleContainment: string;
           gridX: number;
           gridY: number;
@@ -103,6 +105,7 @@ interface PowerCircuitItem {
   socketType: string;
   posX: number;
   posY: number;
+  elevation?: string;
 }
 
 export default function HierarchyExplorerPage() {
@@ -116,9 +119,6 @@ export default function HierarchyExplorerPage() {
     "STANDARD"
   );
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
-  const [heatmapMode, setHeatmapMode] = useState<
-    "U_SPACE" | "POWER_KW" | "REDUNDANCY"
-  >("POWER_KW");
 
   // Modal state for Admin adding hierarchy entities
   const [modalOpen, setModalOpen] = useState(false);
@@ -480,7 +480,7 @@ export default function HierarchyExplorerPage() {
                       {activeRoom.code}
                     </span>
                     <h2 className="text-lg font-bold text-white">
-                      {activeRoom.name} — 2D Raised-Floor Tile Map
+                      {activeRoom.name} — Raised-Floor Plan
                     </h2>
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
@@ -493,274 +493,23 @@ export default function HierarchyExplorerPage() {
                     • Target Temp: {activeRoom.ambientTempTargetC}°C
                   </p>
                 </div>
-
-                {/* Heatmap Layer Selector */}
-                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
-                  <Layers className="w-3.5 h-3.5 text-slate-400 ml-2 mr-1" />
-                  <button
-                    onClick={() => setHeatmapMode("POWER_KW")}
-                    className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                      heatmapMode === "POWER_KW"
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Power Heatmap
-                  </button>
-                  <button
-                    onClick={() => setHeatmapMode("U_SPACE")}
-                    className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                      heatmapMode === "U_SPACE"
-                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    U Space
-                  </button>
-                  <button
-                    onClick={() => setHeatmapMode("REDUNDANCY")}
-                    className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                      heatmapMode === "REDUNDANCY"
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    A/B Redundancy
-                  </button>
-                </div>
               </div>
 
-              {/* 2D Raised Floor Grid Visualization */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto">
-                <div className="min-w-[680px] space-y-4">
-                  {/* Legend */}
-                  <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pb-2 border-b border-slate-800/80 gap-3">
-                    <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded bg-cyan-500/30 border border-cyan-400 inline-block" />
-                        Rack Enclosure (Click to Open)
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded bg-sky-500/30 border border-sky-400 inline-block" />
-                        CRAC / CRAH / In-Row Cooling Unit
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded bg-amber-500/30 border border-amber-400 inline-block" />
-                        Under-Floor Commando Socket (L1/L2/L3)
-                      </span>
-                    </div>
-                    <span>
-                      Grid: {activeRoom.gridCols} × {activeRoom.gridRows} Raised
-                      Floor Tiles (600mm × 600mm)
-                    </span>
-                  </div>
-
-                  {/* Floor Plan Sections: Perimeter Cooling, Rows & Floor Sockets */}
-                  <div className="space-y-4">
-                    {/* Cooling Units Bar */}
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-400 mb-2 flex items-center gap-1.5">
-                        <ThermometerSnowflake className="w-3.5 h-3.5" />
-                        Room Cooling Plant & Perimeter CRAH/In-Row Units
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {activeRoom.coolingUnits.map((cu) => (
-                          <div
-                            key={cu.id}
-                            className="p-3 rounded-lg bg-sky-950/30 border border-sky-500/30 flex items-center justify-between"
-                          >
-                            <div>
-                              <div className="text-xs font-bold text-white">
-                                {cu.name}
-                              </div>
-                              <div className="text-[11px] text-sky-300 font-mono">
-                                {cu.unitType} • {cu.capacityKw} kW Thermal
-                              </div>
-                            </div>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                cu.status === "ONLINE"
-                                  ? "bg-emerald-500/20 text-emerald-300"
-                                  : "bg-amber-500/20 text-amber-300"
-                              }`}
-                            >
-                              {cu.status}
-                            </span>
-                          </div>
-                        ))}
-                        {activeRoom.coolingUnits.length === 0 && (
-                          <div className="text-xs text-slate-500 italic">
-                            No dedicated cooling units documented in this room.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Rows and Racks Floor Layout */}
-                    {activeRoom.rows.map((row) => (
-                      <div
-                        key={row.id}
-                        className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-white">
-                              {row.name}
-                            </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-semibold">
-                              {row.aisleContainment.replace("_", " ")}
-                            </span>
-                          </div>
-                          {currentUserRole === "ADMIN" && (
-                            <button
-                              onClick={() => openAddModal("RACK", row.id)}
-                              className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
-                            >
-                              <Plus className="w-3 h-3" /> Add Rack to Row
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {row.racks.map((rk) => {
-                            const m = rackMetrics[rk.id];
-                            const uPct = m?.uUtilizationPct ?? 0;
-                            const pwrPct = m?.powerUtilizationPct ?? 0;
-                            const hasSpof = (m?.spofDeviceCount ?? 0) > 0;
-
-                            let borderClass =
-                              "border-cyan-500/40 bg-slate-950/90";
-                            if (heatmapMode === "POWER_KW") {
-                              borderClass =
-                                pwrPct >= 75
-                                  ? "border-rose-500/60 bg-rose-950/20"
-                                  : pwrPct >= 40
-                                  ? "border-amber-500/60 bg-amber-950/20"
-                                  : "border-emerald-500/50 bg-emerald-950/15";
-                            } else if (heatmapMode === "U_SPACE") {
-                              borderClass =
-                                uPct >= 80
-                                  ? "border-rose-500/60 bg-rose-950/20"
-                                  : "border-cyan-500/50 bg-cyan-950/15";
-                            } else if (heatmapMode === "REDUNDANCY") {
-                              borderClass = hasSpof
-                                ? "border-amber-500/70 bg-amber-950/25"
-                                : "border-emerald-500/60 bg-emerald-950/20";
-                            }
-
-                            const rackSockets = roomCircuits.filter(
-                              (c) => c.rackId === rk.id
-                            );
-
-                            return (
-                              <Link
-                                key={rk.id}
-                                href={`/racks/${rk.id}`}
-                                className={`p-3.5 rounded-xl border ${borderClass} hover:scale-[1.01] transition-all flex flex-col justify-between gap-3 group`}
-                              >
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <div className="text-sm font-bold text-white flex items-center gap-1.5 group-hover:text-cyan-300">
-                                      <Server className="w-4 h-4 text-cyan-400" />
-                                      {rk.code}
-                                      <ArrowUpRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
-                                    </div>
-                                    <div className="text-[11px] text-slate-400 mt-0.5">
-                                      {rk.name}
-                                    </div>
-                                  </div>
-                                  {hasSpof ? (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                                      <Flame className="w-3 h-3" /> SPOF
-                                    </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3" /> 2N OK
-                                    </span>
-                                  )}
-                                </div>
-
-                                {m && (
-                                  <div className="space-y-2 text-xs">
-                                    <div>
-                                      <div className="flex justify-between text-[11px] mb-1">
-                                        <span className="text-slate-400">
-                                          U Space
-                                        </span>
-                                        <span className="font-mono text-white">
-                                          {m.usedU}/{m.totalU}U ({m.freeU}U
-                                          free)
-                                        </span>
-                                      </div>
-                                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                                        <div
-                                          className="h-full bg-cyan-400"
-                                          style={{
-                                            width: `${Math.min(100, uPct)}%`,
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div>
-                                      <div className="flex justify-between text-[11px] mb-1">
-                                        <span className="text-slate-400">
-                                          Power Load
-                                        </span>
-                                        <span className="font-mono text-amber-300">
-                                          {m.currentPowerWatts}W /{" "}
-                                          {m.maxPowerWatts}W
-                                        </span>
-                                      </div>
-                                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                                        <div
-                                          className="h-full bg-amber-400"
-                                          style={{
-                                            width: `${Math.min(100, pwrPct)}%`,
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80 text-slate-400">
-                                      <span>
-                                        PDU Outlets: {m.freeOutlets} free /{" "}
-                                        {m.totalOutlets}
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Floor Sockets under this Rack */}
-                                {rackSockets.length > 0 && (
-                                  <div className="pt-2 border-t border-slate-800/80 space-y-1">
-                                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                                      <PlugZap className="w-3 h-3 text-amber-400" />
-                                      Floor Power Whips:
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                      {rackSockets.map((fs) => (
-                                        <span
-                                          key={fs.id}
-                                          className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-amber-200"
-                                        >
-                                          {fs.floorSocketLabel} (
-                                          {fs.phaseAllocation} • {fs.ratedAmps}
-                                          A)
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <FloorPlan
+                room={activeRoom}
+                sockets={roomCircuits.map((circuit) => ({
+                  id: circuit.id,
+                  floorSocketLabel: circuit.floorSocketLabel,
+                  phaseAllocation: circuit.phaseAllocation,
+                  ratedAmps: circuit.ratedAmps,
+                  posX: circuit.posX,
+                  posY: circuit.posY,
+                  elevation: circuit.elevation || "UNDERFLOOR",
+                }))}
+                metrics={rackMetrics}
+                admin={currentUserRole === "ADMIN"}
+                onChanged={fetchSnapshot}
+              />
             </div>
           ) : (
             <div className="p-8 rounded-xl bg-slate-900 border border-slate-800 text-center text-sm text-slate-400">
