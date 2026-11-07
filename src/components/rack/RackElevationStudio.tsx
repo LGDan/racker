@@ -201,6 +201,13 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showPdu, setShowPdu] = useState(false);
+  const [pduDraft, setPduDraft] = useState({
+    name: "",
+    feedSide: "A",
+    mounting: "ZERO_U_LEFT",
+    circuitId: "",
+  });
   const [templateId, setTemplateId] = useState("");
   const [draft, setDraft] = useState({
     name: "",
@@ -434,6 +441,13 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           >
             <Plus className="h-3.5 w-3.5" /> Install device
           </button>
+          <button
+            type="button"
+            onClick={() => setShowPdu((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-100"
+          >
+            <PlugZap className="h-3.5 w-3.5 text-amber-300" /> Add PDU
+          </button>
         </div>
       </div>
 
@@ -592,6 +606,88 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
               className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50"
             >
               {busy ? "Installing…" : "Place in rack"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {showPdu && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const ok = await operate({
+              action: "ADD_RACK_PDU",
+              rackId: rack.id,
+              name: pduDraft.name,
+              feedSide: pduDraft.feedSide,
+              mounting: pduDraft.mounting,
+              circuitId: pduDraft.circuitId || null,
+              phaseMode: "SINGLE_PHASE",
+              maxAmps: 32,
+              voltageV: 230,
+            });
+            if (ok) {
+              setShowPdu(false);
+              setMessage(`Added ${pduDraft.name}.`);
+            }
+          }}
+          className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-4 md:grid-cols-5"
+        >
+          <Field label="PDU name" className="md:col-span-2">
+            <input
+              required
+              value={pduDraft.name}
+              onChange={(e) => setPduDraft({ ...pduDraft, name: e.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
+            />
+          </Field>
+          <Field label="Feed">
+            <select
+              value={pduDraft.feedSide}
+              onChange={(e) =>
+                setPduDraft({
+                  ...pduDraft,
+                  feedSide: e.target.value,
+                  mounting: e.target.value === "B" ? "ZERO_U_RIGHT" : "ZERO_U_LEFT",
+                })
+              }
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
+            >
+              <option value="A">A</option>
+              <option value="B">B</option>
+            </select>
+          </Field>
+          <Field label="Mounting">
+            <select
+              value={pduDraft.mounting}
+              onChange={(e) => setPduDraft({ ...pduDraft, mounting: e.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
+            >
+              <option value="ZERO_U_LEFT">ZERO_U_LEFT</option>
+              <option value="ZERO_U_RIGHT">ZERO_U_RIGHT</option>
+              <option value="RACKMOUNT">RACKMOUNT</option>
+            </select>
+          </Field>
+          <Field label="Floor socket">
+            <select
+              value={pduDraft.circuitId}
+              onChange={(e) => setPduDraft({ ...pduDraft, circuitId: e.target.value })}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
+            >
+              <option value="">None yet</option>
+              {roomCircuits.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.floorSocketLabel} · {c.phaseAllocation} · {c.ratedAmps}A
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="flex items-end">
+            <button
+              disabled={busy}
+              className="rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50"
+            >
+              {busy ? "Adding…" : "Add PDU"}
             </button>
           </div>
         </form>

@@ -794,10 +794,11 @@ export default function HierarchyExplorerPage() {
 
             <form onSubmit={handleCreateEntity} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 mb-1 font-medium">
+                <label htmlFor="hierarchy-name" className="block text-slate-300 mb-1 font-medium">
                   Name / Description
                 </label>
                 <input
+                  id="hierarchy-name"
                   type="text"
                   required
                   value={formName}
@@ -818,10 +819,11 @@ export default function HierarchyExplorerPage() {
                 entityType === "ROOM" ||
                 entityType === "RACK") && (
                 <div>
-                  <label className="block text-slate-300 mb-1 font-medium">
+                  <label htmlFor="hierarchy-code" className="block text-slate-300 mb-1 font-medium">
                     Short Code
                   </label>
                   <input
+                    id="hierarchy-code"
                     type="text"
                     required
                     value={formCode}

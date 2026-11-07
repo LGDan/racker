@@ -190,12 +190,13 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label htmlFor="operator-email" className="block text-xs font-medium text-slate-300 mb-1.5">
                 Operator Email
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                 <input
+                  id="operator-email"
                   type="email"
                   required
                   value={email}
@@ -207,12 +208,13 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label htmlFor="operator-password" className="block text-xs font-medium text-slate-300 mb-1.5">
                 Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                 <input
+                  id="operator-password"
                   type="password"
                   required
                   value={password}
