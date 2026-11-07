@@ -1,0 +1,319 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         String     @default("STANDARD") // ADMIN | STANDARD
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  details    String?
+  createdAt  DateTime @default(now())
+}
+
+model Site {
+  id                String        @id @default(cuid())
+  name              String
+  code              String        @unique
+  address           String
+  city              String
+  country           String
+  utilityCapacityKw Float         @default(2000)
+  pueTarget         Float         @default(1.28)
+  buildings         Building[]
+  powerSources      PowerSource[]
+  createdAt         DateTime      @default(now())
+}
+
+model Building {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  floors    Floor[]
+  createdAt DateTime @default(now())
+}
+
+model Floor {
+  id          String   @id @default(cuid())
+  buildingId  String
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  name        String
+  levelNumber Int
+  rooms       Room[]
+  createdAt   DateTime @default(now())
+}
+
+model Room {
+  id                 String         @id @default(cuid())
+  floorId            String
+  floor              Floor          @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  name               String
+  code               String
+  roomType           String         @default("DATA_HALL") // DATA_HALL | POWER_ROOM | COOLING_PLANT | MEET_ME
+  coolingCapacityKw  Float          @default(500)
+  coolingRedundancy  String         @default("N_PLUS_1") // N | N_PLUS_1 | TWO_N
+  ambientTempTargetC Float          @default(22.0)
+  humidityTargetPct  Float          @default(45.0)
+  widthMm            Int            @default(12000)
+  depthMm            Int            @default(10000)
+  gridCols           Int            @default(12)
+  gridRows           Int            @default(10)
+  rows               Row[]
+  coolingUnits       CoolingUnit[]
+  powerSources       PowerSource[]
+  powerPanels        PowerPanel[]
+  powerCircuits      PowerCircuit[]
+  createdAt          DateTime       @default(now())
+}
+
+model CoolingUnit {
+  id             String   @id @default(cuid())
+  roomId         String
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  name           String
+  unitType       String   @default("CRAC") // CRAC | CRAH | IN_ROW | CHILLER
+  capacityKw     Float    @default(150)
+  airflowCfm     Int      @default(12000)
+  supplyTempC    Float    @default(18.5)
+  returnTempC    Float    @default(27.0)
+  status         String   @default("ONLINE") // ONLINE | STANDBY | MAINTENANCE | FAULT
+  powerDrawWatts Float    @default(18000)
+  posX           Int      @default(0)
+  posY           Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model Row {
+  id               String   @id @default(cuid())
+  roomId           String
+  room             Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  name             String
+  orientation      String   @default("HORIZONTAL") // HORIZONTAL | VERTICAL
+  aisleContainment String   @default("COLD_AISLE") // NONE | HOT_AISLE | COLD_AISLE
+  gridX            Int      @default(1)
+  gridY            Int      @default(2)
+  racks            Rack[]
+  createdAt        DateTime @default(now())
+}
+
+model Rack {
+  id            String         @id @default(cuid())
+  rowId         String
+  row           Row            @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  name          String
+  code          String
+  totalU        Int            @default(42)
+  maxWeightKg   Float          @default(1200)
+  maxPowerWatts Float          @default(15000)
+  widthMm       Int            @default(600)
+  depthMm       Int            @default(1200)
+  posX          Int            @default(1)
+  posY          Int            @default(2)
+  pdus          RackPdu[]
+  devices       RackDevice[]
+  floorSockets  PowerCircuit[]
+  createdAt     DateTime       @default(now())
+}
+
+model PowerSource {
+  id                 String        @id @default(cuid())
+  siteId             String
+  site               Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  roomId             String?
+  room               Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  name               String
+  sourceType         String // UTILITY | GENERATOR | ATS | UPS | TRANSFORMER
+  redundancyGroup    String        @default("A") // A | B | SHARED
+  capacityKw         Float         @default(1000)
+  voltageV           Int           @default(400)
+  maxAmps            Float         @default(1440)
+  status             String        @default("ONLINE") // ONLINE | STANDBY | BYPASS | OFFLINE
+  batteryRuntimeMins Int?
+  fuelRuntimeHours   Float?
+  upstreamSourceAId  String?
+  upstreamSourceA    PowerSource?  @relation("UpstreamA", fields: [upstreamSourceAId], references: [id], onDelete: SetNull)
+  downstreamA        PowerSource[] @relation("UpstreamA")
+  upstreamSourceBId  String?
+  upstreamSourceB    PowerSource?  @relation("UpstreamB", fields: [upstreamSourceBId], references: [id], onDelete: SetNull)
+  downstreamB        PowerSource[] @relation("UpstreamB")
+  panels             PowerPanel[]
+  createdAt          DateTime      @default(now())
+}
+
+model PowerPanel {
+  id                String         @id @default(cuid())
+  roomId            String
+  room              Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  upstreamSourceId  String
+  upstreamSource    PowerSource    @relation(fields: [upstreamSourceId], references: [id], onDelete: Cascade)
+  name              String
+  feedSide          String         @default("A") // A | B
+  voltageLToN       Int            @default(230)
+  voltageLToL       Int            @default(400)
+  maxAmpsPerPhase   Float          @default(250)
+  totalBreakerSlots Int            @default(42)
+  status            String         @default("ONLINE") // ONLINE | OFFLINE
+  circuits          PowerCircuit[]
+  createdAt         DateTime       @default(now())
+}
+
+model PowerCircuit {
+  id               String    @id @default(cuid())
+  panelId          String
+  panel            PowerPanel @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  roomId           String
+  room             Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  rackId           String?
+  rack             Rack?     @relation(fields: [rackId], references: [id], onDelete: SetNull)
+  name             String
+  floorSocketLabel String
+  breakerNumber    Int
+  phaseAllocation  String    @default("L1") // L1 | L2 | L3 | THREE_PHASE
+  ratedAmps        Float     @default(32)
+  voltageV         Int       @default(230)
+  socketType       String    @default("IEC_60309_32A_1P") // IEC_60309_32A_1P | IEC_60309_32A_3P | IEC_60309_63A_3P | NEMA_L6_30R
+  status           String    @default("ONLINE") // ONLINE | TRIPPED | OFF
+  posX             Int       @default(1)
+  posY             Int       @default(1)
+  pdus             RackPdu[]
+  createdAt        DateTime  @default(now())
+}
+
+model RackPdu {
+  id            String        @id @default(cuid())
+  rackId        String
+  rack          Rack          @relation(fields: [rackId], references: [id], onDelete: Cascade)
+  circuitId     String?
+  circuit       PowerCircuit? @relation(fields: [circuitId], references: [id], onDelete: SetNull)
+  name          String
+  model         String        @default("APC AP8853 Zero-U 32A")
+  mounting      String        @default("ZERO_U_LEFT") // ZERO_U_LEFT | ZERO_U_RIGHT | RACKMOUNT
+  startU        Int?
+  uHeight       Int           @default(0)
+  feedSide      String        @default("A") // A | B
+  phaseMode     String        @default("SINGLE_PHASE") // SINGLE_PHASE | THREE_PHASE
+  maxAmps       Float         @default(32)
+  voltageV      Int           @default(230)
+  maxWatts      Float         @default(7360)
+  inputPlugType String        @default("IEC_60309_32A_1P")
+  status        String        @default("ONLINE") // ONLINE | OFFLINE
+  outlets       PduOutlet[]
+  createdAt     DateTime      @default(now())
+}
+
+model PduOutlet {
+  id           String     @id @default(cuid())
+  pduId        String
+  pdu          RackPdu    @relation(fields: [pduId], references: [id], onDelete: Cascade)
+  outletNumber Int
+  label        String
+  bankPhase    String     @default("L1") // L1 | L2 | L3
+  socketType   String     @default("C13") // C13 | C19
+  maxAmps      Float      @default(10)
+  connectedPsu DevicePsu?
+}
+
+model DeviceTemplate {
+  id           String       @id @default(cuid())
+  manufacturer String
+  model        String
+  deviceType   String // SERVER | SWITCH | ROUTER | FIREWALL | STORAGE | PATCH_PANEL | UPS_RACK
+  uHeight      Int          @default(1)
+  defaultWatts Float        @default(450)
+  peakWatts    Float        @default(700)
+  weightKg     Float        @default(18)
+  psuCount     Int          @default(2)
+  psuPlugType  String       @default("C14") // C14 | C20
+  portCount    Int          @default(4)
+  portType     String       @default("SFP28_25G")
+  devices      RackDevice[]
+}
+
+model RackDevice {
+  id           String          @id @default(cuid())
+  rackId       String
+  rack         Rack            @relation(fields: [rackId], references: [id], onDelete: Cascade)
+  templateId   String?
+  template     DeviceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  name         String
+  hostname     String?
+  assetTag     String?
+  serialNumber String?
+  deviceType   String          @default("SERVER") // SERVER | SWITCH | ROUTER | FIREWALL | STORAGE | PATCH_PANEL | UPS_RACK
+  manufacturer String          @default("Dell")
+  model        String          @default("PowerEdge R760")
+  startU       Int
+  uHeight      Int             @default(2)
+  face         String          @default("BOTH") // FRONT | REAR | BOTH
+  status       String          @default("ACTIVE") // ACTIVE | PROVISIONING | MAINTENANCE | OFFLINE
+  nominalWatts Float           @default(550)
+  peakWatts    Float           @default(850)
+  weightKg     Float           @default(24)
+  psus         DevicePsu[]
+  networkPorts NetworkPort[]
+  createdAt    DateTime        @default(now())
+}
+
+model DevicePsu {
+  id                String     @id @default(cuid())
+  deviceId          String
+  device            RackDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  name              String // e.g., PSU 1, PSU 2
+  maxWatts          Float      @default(800)
+  plugType          String     @default("C14") // C14 | C20
+  connectedOutletId String?    @unique
+  connectedOutlet   PduOutlet? @relation(fields: [connectedOutletId], references: [id], onDelete: SetNull)
+  cableColor        String     @default("#06b6d4")
+  cableLabel        String?
+}
+
+model NetworkPort {
+  id            String        @id @default(cuid())
+  deviceId      String
+  device        RackDevice    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  name          String // e.g., eth0, Gi1/0/1, Port 1
+  portNumber    Int           @default(1)
+  portType      String        @default("SFP28_25G") // RJ45_1G | RJ45_10G | SFP_PLUS_10G | SFP28_25G | QSFP28_100G | FIBER_LC
+  speedGbps     Int           @default(25)
+  macAddress    String?
+  ipAddress     String?
+  vlanTag       Int?          @default(100)
+  isManagement  Boolean       @default(false)
+  cableAsPortA  NetworkCable? @relation("CablePortA")
+  cableAsPortB  NetworkCable? @relation("CablePortB")
+}
+
+model NetworkCable {
+  id           String      @id @default(cuid())
+  portAId      String      @unique
+  portA        NetworkPort @relation("CablePortA", fields: [portAId], references: [id], onDelete: Cascade)
+  portBId      String      @unique
+  portB        NetworkPort @relation("CablePortB", fields: [portBId], references: [id], onDelete: Cascade)
+  cableType    String      @default("DAC") // CAT6A | DAC | MMF_OM4 | SMF_OS2
+  color        String      @default("#10b981")
+  label        String
+  lengthMeters Float       @default(3.0)
+  createdAt    DateTime    @default(now())
+}

@@ -4,34 +4,34 @@ overview: Build Racker, a full-stack web-based Datacenter Infrastructure Managem
 todos:
   - id: init-project-and-deps
     content: Initialize Next.js TypeScript project, Tailwind CSS, shadcn/ui primitives, React Flow, Lucide icons, and Prisma configuration
-    status: pending
+    status: completed
   - id: schema-and-seed
     content: Design and implement Prisma schema (Sites, Buildings, Floors, Rooms, Cooling, Rows, Racks, PowerSources, Panels, Phases/Circuits, PDUs, Outlets, Devices, PSUs, NetworkPorts/Cables, Users) and realistic datacenter seed script
-    status: pending
+    status: completed
   - id: auth-and-rbac
     content: Implement authentication (login/logout, session cookie) and RBAC middleware/guards distinguishing ADMIN vs STANDARD user permissions
-    status: pending
+    status: completed
   - id: capacity-rollup-engine
     content: Build the bottom-up Capacity & Electrical Rollup Engine (U consumed, Watts, Amps per L1/L2/L3 phase, PDU socket availability, cooling thermal margin, and SPOF blast-radius calculator)
-    status: pending
+    status: completed
   - id: api-routes
     content: Build API routes for spatial hierarchy, upstream power/cooling (Admin), in-rack devices/PDUs/PSUs/network patching (Standard + Admin), and user management (Admin)
-    status: pending
+    status: completed
   - id: dashboard-and-hierarchy-ui
     content: Build Executive Dashboard and Spatial Hierarchy Explorer with interactive 2D Room Floor Plan (racks, rows, cooling units, floor sockets, heatmaps)
-    status: pending
+    status: completed
   - id: interactive-rack-studio
     content: Build Interactive Rack Elevation Studio with U-slot positioning, interactive SVG cable patching (Server PSU to PDU outlet, PDU to Floor Socket, Server NIC to Switch port), and live rack capacity meters
-    status: pending
+    status: completed
   - id: diagrams-and-reports-ui
     content: Build Multi-Layer Diagram Visualizer (React Flow Electrical Single-Line Diagram with failure simulation, 3-phase load indicators, Network Topology layer, and Cooling layer) and Capacity Reporting page
-    status: pending
+    status: completed
   - id: admin-and-power-ui
     content: Build Upstream Power & Cooling Management views and Admin User Management page with role enforcement
-    status: pending
+    status: completed
   - id: docker-and-verification
     content: Create Dockerfile, docker-compose.yml, and entrypoint script, and verify build and end-to-end functionality
-    status: pending
+    status: completed
 isProject: false
 ---
 
