@@ -28,34 +28,19 @@ function applianceColors(deviceType: string) {
 }
 
 function ObstructionMarker({ opacity }: { opacity: number }) {
+  const height = 2.2;
   const faded = opacity < 1;
-  const beam = {
-    color: "#e2e8f0",
-    roughness: 0.55,
-    metalness: 0.15,
-    transparent: faded,
-    opacity,
-  };
   return (
-    <group>
-      <mesh position={[0, 0.06, 0]}>
-        <boxGeometry args={[0.5, 0.12, 0.5]} />
-        <meshStandardMaterial
-          color="#1e293b"
-          roughness={0.75}
-          transparent={faded}
-          opacity={opacity}
-        />
-      </mesh>
-      <mesh position={[0, 0.85, 0]} rotation={[0, Math.PI / 5, Math.PI / 4]}>
-        <boxGeometry args={[0.12, 1.5, 0.12]} />
-        <meshStandardMaterial {...beam} />
-      </mesh>
-      <mesh position={[0, 0.85, 0]} rotation={[0, Math.PI / 5, -Math.PI / 4]}>
-        <boxGeometry args={[0.12, 1.5, 0.12]} />
-        <meshStandardMaterial {...beam} />
-      </mesh>
-    </group>
+    <mesh position={[0, height / 2, 0]}>
+      <boxGeometry args={[0.42, height, 0.42]} />
+      <meshStandardMaterial
+        color="#e11d48"
+        roughness={0.55}
+        metalness={0.08}
+        transparent={faded}
+        opacity={opacity}
+      />
+    </mesh>
   );
 }
 

@@ -206,6 +206,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: tile });
     }
 
+    if (entityType === "CREATE_COOLING_UNIT") {
+      const created = await createOffPlanCooling(body);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "CREATE_COOLING_UNIT",
+          entityType: "COOLING_UNIT",
+          entityId: created.id,
+          details: `Added off-plan ${created.unitType} ${created.name} (${created.capacityKw} kW) to room ${created.roomId}`,
+        },
+      });
+      return NextResponse.json({ item: created });
+    }
+
+    if (entityType === "UNPLACE_COOLING") {
+      const id = String(body.id || "");
+      const updated = await unplaceCooling(id);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "UNPLACE_COOLING",
+          entityType: "COOLING_UNIT",
+          entityId: id,
+          details: `Removed ${updated.name} from the floor plan`,
+        },
+      });
+      return NextResponse.json({ item: updated });
+    }
+
+    if (entityType === "DELETE_COOLING_UNIT") {
+      const id = String(body.id || "");
+      const removed = await deleteCooling(id);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "DELETE_COOLING_UNIT",
+          entityType: "COOLING_UNIT",
+          entityId: id,
+          details: `Deleted cooling unit ${removed.name}`,
+        },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
     if (entityType === "RESIZE_ROOM") {
       const roomId = String(body.roomId || "");
       const gridCols = Number(body.gridCols);
@@ -439,6 +483,59 @@ async function moveOnFloor(
   }
 
   throw new FloorError("Unknown floor move");
+}
+
+const COOLING_TYPES = new Set(["CRAC", "CRAH", "IN_ROW", "AHU", "CHILLER"]);
+
+async function createOffPlanCooling(body: {
+  roomId?: unknown;
+  name?: unknown;
+  unitType?: unknown;
+  capacityKw?: unknown;
+}) {
+  const roomId = String(body.roomId || "");
+  const name = String(body.name || "").trim();
+  const unitType = String(body.unitType || "CRAH");
+  const capacityKw = Number(body.capacityKw);
+  if (!name) throw new FloorError("Cooling unit name is required");
+  if (name.length > 120) throw new FloorError("Cooling unit name is too long");
+  if (!COOLING_TYPES.has(unitType)) throw new FloorError("Unknown cooling unit type");
+  if (!Number.isFinite(capacityKw) || capacityKw <= 0) {
+    throw new FloorError("Capacity must be a positive number of kW");
+  }
+  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  if (!room) throw new FloorError("Room not found", 404);
+  return prisma.coolingUnit.create({
+    data: {
+      roomId,
+      name,
+      unitType,
+      capacityKw,
+      airflowCfm: 14000,
+      supplyTempC: 18.5,
+      returnTempC: 27,
+      status: "ONLINE",
+      powerDrawWatts: 6000,
+      posX: 0,
+      posY: 0,
+    },
+  });
+}
+
+async function unplaceCooling(id: string) {
+  const unit = await prisma.coolingUnit.findUnique({ where: { id } });
+  if (!unit) throw new FloorError("Cooling unit not found", 404);
+  return prisma.coolingUnit.update({
+    where: { id },
+    data: { posX: 0, posY: 0 },
+  });
+}
+
+async function deleteCooling(id: string) {
+  const unit = await prisma.coolingUnit.findUnique({ where: { id } });
+  if (!unit) throw new FloorError("Cooling unit not found", 404);
+  await prisma.coolingUnit.delete({ where: { id } });
+  return unit;
 }
 
 async function setFloorTile(

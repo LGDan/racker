@@ -37,6 +37,7 @@ export interface FloorRoom {
     id: string;
     name: string;
     unitType: string;
+    capacityKw: number;
     status: string;
     posX: number;
     posY: number;
@@ -79,6 +80,12 @@ const FloorPlan3D = dynamic(
     ),
   }
 );
+
+const COOLING_TYPES = ["CRAC", "CRAH", "IN_ROW", "AHU", "CHILLER"] as const;
+
+function onPlan(posX: number, posY: number) {
+  return posX >= 1 && posY >= 1;
+}
 
 const LAYERS: { id: FloorLayer; label: string }[] = [
   { id: "UNDERFLOOR", label: "Underfloor" },
@@ -143,6 +150,12 @@ export function FloorPlan({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [cols, setCols] = useState(room.gridCols);
   const [rows, setRows] = useState(room.gridRows);
+  const [placingId, setPlacingId] = useState<string | null>(null);
+  const [unitName, setUnitName] = useState("");
+  const [unitType, setUnitType] = useState<(typeof COOLING_TYPES)[number]>("AHU");
+  const [unitKw, setUnitKw] = useState(150);
+  const [grillX, setGrillX] = useState(1);
+  const [grillY, setGrillY] = useState(1);
   const gridRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const router = useRouter();
@@ -150,6 +163,7 @@ export function FloorPlan({
   useEffect(() => {
     setCols(room.gridCols);
     setRows(room.gridRows);
+    setPlacingId(null);
   }, [room.id, room.gridCols, room.gridRows]);
 
   const grills = new Set(
@@ -209,9 +223,10 @@ export function FloorPlan({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(typeof data.error === "string" ? data.error : "Layout change was rejected");
-        return;
+        return false;
       }
       await onChanged();
+      return true;
     } finally {
       setSaving(false);
     }
@@ -263,6 +278,17 @@ export function FloorPlan({
     }
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+  }
+
+  async function placeCooling(id: string, x: number, y: number) {
+    const ok = await postLayout({
+      entityType: "MOVE_ON_FLOOR",
+      kind: "COOLING_UNIT",
+      id,
+      posX: x,
+      posY: y,
+    });
+    if (ok) setPlacingId(null);
   }
 
   async function toggleGrill(x: number, y: number) {
@@ -500,6 +526,16 @@ export function FloorPlan({
                       <div
                         key={key}
                         onClick={() => {
+                          if (placingId && rackFocus) {
+                            if (rack || cooling || blocked) {
+                              setError(
+                                "Choose an empty tile with no rack, cooling unit, or obstruction"
+                              );
+                              return;
+                            }
+                            void placeCooling(placingId, x, y);
+                            return;
+                          }
                           if (floorFocus) void toggleGrill(x, y);
                           else if (rackFocus) void toggleObstruction(x, y);
                         }}
@@ -508,7 +544,8 @@ export function FloorPlan({
                             ? "border-cyan-300 ring-2 ring-cyan-300"
                             : "border-slate-800"
                         } ${
-                          editing && (floorFocus || (rackFocus && !rack && !cooling))
+                          (editing && (floorFocus || (rackFocus && !rack && !cooling))) ||
+                          (placingId && rackFocus && !rack && !cooling && !blocked)
                             ? "cursor-pointer"
                             : ""
                         }`}
@@ -604,6 +641,22 @@ export function FloorPlan({
                             onClick={(event) => event.stopPropagation()}
                           >
                             {cooling.unitType}
+                            {canDragRack && (
+                              <button
+                                type="button"
+                                className="block mt-0.5 underline font-medium"
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void postLayout({
+                                    entityType: "UNPLACE_COOLING",
+                                    id: cooling.id,
+                                  });
+                                }}
+                              >
+                                Off plan
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -710,7 +763,9 @@ export function FloorPlan({
             Resize room
           </button>
           <span className="text-slate-500 pb-1">
-            {layer === "FLOOR"
+            {placingId
+              ? "Click an empty rack tile to place the selected cooling unit."
+              : layer === "FLOOR"
               ? "Click a tile to toggle a solid slab and an airflow grill."
               : socketLayer
               ? "Drag a socket on this elevation, or send it to the other plane."
@@ -718,6 +773,379 @@ export function FloorPlan({
           </span>
         </form>
       )}
+
+      <CoolingRegister
+        room={room}
+        admin={admin}
+        editing={editing && view === "2D"}
+        saving={saving}
+        placingId={placingId}
+        unitName={unitName}
+        unitType={unitType}
+        unitKw={unitKw}
+        onUnitName={setUnitName}
+        onUnitType={setUnitType}
+        onUnitKw={setUnitKw}
+        onPlace={(id) => {
+          setPlacingId(id);
+          setLayer("RACK");
+          setView("2D");
+          setError(null);
+        }}
+        onCancelPlace={() => setPlacingId(null)}
+        onUnplace={(id) =>
+          void postLayout({ entityType: "UNPLACE_COOLING", id })
+        }
+        onDelete={(id) =>
+          void postLayout({ entityType: "DELETE_COOLING_UNIT", id })
+        }
+        onCreate={() => {
+          const name = unitName.trim();
+          if (!name) {
+            setError("Cooling unit name is required");
+            return;
+          }
+          void postLayout({
+            entityType: "CREATE_COOLING_UNIT",
+            roomId: room.id,
+            name,
+            unitType,
+            capacityKw: unitKw,
+          }).then((ok) => {
+            if (ok) setUnitName("");
+          });
+        }}
+      />
+
+      <GrillRegister
+        room={room}
+        grills={(room.floorTiles || [])
+          .filter((tile) => tile.surface === "GRILL")
+          .sort((a, b) => a.posY - b.posY || a.posX - b.posX)
+          .map((tile) => cellKey(tile.posX, tile.posY))}
+        admin={admin}
+        editing={editing && view === "2D"}
+        saving={saving}
+        grillX={grillX}
+        grillY={grillY}
+        onGrillX={setGrillX}
+        onGrillY={setGrillY}
+        onAdd={() =>
+          void postLayout({
+            entityType: "SET_FLOOR_TILE",
+            roomId: room.id,
+            posX: grillX,
+            posY: grillY,
+            surface: "GRILL",
+          })
+        }
+        onRemove={(x, y) =>
+          void postLayout({
+            entityType: "SET_FLOOR_TILE",
+            roomId: room.id,
+            posX: x,
+            posY: y,
+            surface: "SOLID",
+          })
+        }
+      />
     </div>
+  );
+}
+
+function CoolingRegister({
+  room,
+  admin,
+  editing,
+  saving,
+  placingId,
+  unitName,
+  unitType,
+  unitKw,
+  onUnitName,
+  onUnitType,
+  onUnitKw,
+  onPlace,
+  onCancelPlace,
+  onUnplace,
+  onDelete,
+  onCreate,
+}: {
+  room: FloorRoom;
+  admin: boolean;
+  editing: boolean;
+  saving: boolean;
+  placingId: string | null;
+  unitName: string;
+  unitType: (typeof COOLING_TYPES)[number];
+  unitKw: number;
+  onUnitName: (value: string) => void;
+  onUnitType: (value: (typeof COOLING_TYPES)[number]) => void;
+  onUnitKw: (value: number) => void;
+  onPlace: (id: string) => void;
+  onCancelPlace: () => void;
+  onUnplace: (id: string) => void;
+  onDelete: (id: string) => void;
+  onCreate: () => void;
+}) {
+  const units = [...room.coolingUnits].sort((a, b) => {
+    const placed = Number(onPlan(a.posX, a.posY)) - Number(onPlan(b.posX, b.posY));
+    if (placed !== 0) return placed;
+    return a.name.localeCompare(b.name);
+  });
+  const offPlan = units.filter((unit) => !onPlan(unit.posX, unit.posY));
+
+  return (
+    <section className="rounded-xl border border-slate-800 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-800">
+        <h3 className="text-sm font-semibold text-white">Cooling for this room</h3>
+        <p className="text-[11px] text-slate-400 mt-1">
+          Air handlers and chillers that are not in this tile grid stay in this
+          list and still count toward the room cooling total.
+          {offPlan.length > 0
+            ? ` ${offPlan.length} ${offPlan.length === 1 ? "unit is" : "units are"} off the plan.`
+            : ""}
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left text-slate-500">
+            <tr className="border-b border-slate-800">
+              <th className="px-4 py-2 font-medium">Name</th>
+              <th className="px-3 py-2 font-medium">Type</th>
+              <th className="px-3 py-2 font-medium">Capacity</th>
+              <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium">Location</th>
+              {editing && <th className="px-3 py-2 font-medium"> </th>}
+            </tr>
+          </thead>
+          <tbody>
+            {units.length === 0 && (
+              <tr>
+                <td colSpan={editing ? 6 : 5} className="px-4 py-3 text-slate-500">
+                  No cooling units serve this room yet.
+                </td>
+              </tr>
+            )}
+            {units.map((unit) => {
+              const placed = onPlan(unit.posX, unit.posY);
+              return (
+                <tr key={unit.id} className="border-b border-slate-800/80 text-slate-200">
+                  <td className="px-4 py-2 font-medium">{unit.name}</td>
+                  <td className="px-3 py-2">{unit.unitType}</td>
+                  <td className="px-3 py-2">{unit.capacityKw} kW</td>
+                  <td className="px-3 py-2">{unit.status}</td>
+                  <td className="px-3 py-2">
+                    {placed ? `Tile ${unit.posX},${unit.posY}` : "Not on this plan"}
+                  </td>
+                  {editing && (
+                    <td className="px-3 py-2 text-right whitespace-nowrap space-x-2">
+                      {placed ? (
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => onUnplace(unit.id)}
+                          className="text-cyan-300 hover:text-cyan-100"
+                        >
+                          Remove from plan
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              placingId === unit.id ? onCancelPlace() : onPlace(unit.id)
+                            }
+                            className="text-cyan-300 hover:text-cyan-100"
+                          >
+                            {placingId === unit.id ? "Cancel place" : "Place on plan"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => onDelete(unit.id)}
+                            className="text-rose-300 hover:text-rose-100"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {admin && editing && (
+        <form
+          className="flex flex-wrap items-end gap-2 px-4 py-3 border-t border-slate-800"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onCreate();
+          }}
+        >
+          <label className="space-y-1 text-slate-400">
+            <span>Off-plan unit</span>
+            <input
+              value={unitName}
+              onChange={(event) => onUnitName(event.target.value)}
+              placeholder="Roof AHU 1"
+              className="block w-40 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
+            />
+          </label>
+          <label className="space-y-1 text-slate-400">
+            <span>Type</span>
+            <select
+              value={unitType}
+              onChange={(event) =>
+                onUnitType(event.target.value as (typeof COOLING_TYPES)[number])
+              }
+              className="block rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
+            >
+              {COOLING_TYPES.map((type) => (
+                <option key={type}>{type}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-slate-400">
+            <span>kW</span>
+            <input
+              type="number"
+              min={1}
+              step="any"
+              value={unitKw}
+              onChange={(event) => onUnitKw(Number(event.target.value))}
+              className="block w-20 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-3 py-1.5 rounded-md bg-sky-500 text-slate-950 font-semibold"
+          >
+            Add off-plan unit
+          </button>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function GrillRegister({
+  room,
+  grills,
+  admin,
+  editing,
+  saving,
+  grillX,
+  grillY,
+  onGrillX,
+  onGrillY,
+  onAdd,
+  onRemove,
+}: {
+  room: FloorRoom;
+  grills: string[];
+  admin: boolean;
+  editing: boolean;
+  saving: boolean;
+  grillX: number;
+  grillY: number;
+  onGrillX: (value: number) => void;
+  onGrillY: (value: number) => void;
+  onAdd: () => void;
+  onRemove: (x: number, y: number) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-800 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-800">
+        <h3 className="text-sm font-semibold text-white">Airflow grills</h3>
+        <p className="text-[11px] text-slate-400 mt-1">
+          {grills.length} grill {grills.length === 1 ? "tile" : "tiles"}. Add one
+          by coordinate, or click a tile on the Floor layer while editing.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left text-slate-500">
+            <tr className="border-b border-slate-800">
+              <th className="px-4 py-2 font-medium">Tile</th>
+              {editing && <th className="px-3 py-2 font-medium"> </th>}
+            </tr>
+          </thead>
+          <tbody>
+            {grills.length === 0 && (
+              <tr>
+                <td colSpan={editing ? 2 : 1} className="px-4 py-3 text-slate-500">
+                  This room has no airflow grills.
+                </td>
+              </tr>
+            )}
+            {grills.map((key) => {
+              const [x, y] = key.split(",");
+              return (
+                <tr key={key} className="border-b border-slate-800/80 text-slate-200">
+                  <td className="px-4 py-2">Tile {x},{y}</td>
+                  {editing && (
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => onRemove(Number(x), Number(y))}
+                        className="text-rose-300 hover:text-rose-100"
+                      >
+                        Make solid
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {admin && editing && (
+        <form
+          className="flex flex-wrap items-end gap-2 px-4 py-3 border-t border-slate-800"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onAdd();
+          }}
+        >
+          <label className="space-y-1 text-slate-400">
+            <span>Column</span>
+            <input
+              type="number"
+              min={1}
+              max={room.gridCols}
+              value={grillX}
+              onChange={(event) => onGrillX(Number(event.target.value))}
+              className="block w-20 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
+            />
+          </label>
+          <label className="space-y-1 text-slate-400">
+            <span>Row</span>
+            <input
+              type="number"
+              min={1}
+              max={room.gridRows}
+              value={grillY}
+              onChange={(event) => onGrillY(Number(event.target.value))}
+              className="block w-20 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-3 py-1.5 rounded-md bg-cyan-400 text-slate-950 font-semibold"
+          >
+            Add grill
+          </button>
+        </form>
+      )}
+    </section>
   );
 }
