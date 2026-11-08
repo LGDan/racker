@@ -21,6 +21,19 @@ services:
     environment:
       DATABASE_URL: postgresql://racker:racker@db:5432/racker?schema=public
       AUTH_SECRET: racker-dcim-super-secret-jwt-key-2026
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-Single Sign-On}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
+      OIDC_ROLE_CLAIM: ${OIDC_ROLE_CLAIM:-groups}
+      OIDC_ADMIN_GROUP: ${OIDC_ADMIN_GROUP:-racker-admins}
+      OIDC_DEFAULT_ROLE: ${OIDC_DEFAULT_ROLE:-STANDARD}
+      OIDC_AUTHORIZATION_ENDPOINT: ${OIDC_AUTHORIZATION_ENDPOINT:-}
+      OIDC_TOKEN_ENDPOINT: ${OIDC_TOKEN_ENDPOINT:-}
+      OIDC_USERINFO_ENDPOINT: ${OIDC_USERINFO_ENDPOINT:-}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-}
     depends_on:
       db:
         condition: service_healthy

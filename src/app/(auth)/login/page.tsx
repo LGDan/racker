@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Server,
@@ -9,6 +9,7 @@ import {
   Lock,
   Mail,
   ArrowRight,
+  KeyRound,
   Zap,
   Layers,
   ThermometerSnowflake,
@@ -21,6 +22,27 @@ export default function LoginPage() {
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [oidc, setOidc] = useState<{ enabled: boolean; providerName: string }>({
+    enabled: false,
+    providerName: "Single Sign-On",
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("error");
+    if (err) setError(err);
+    fetch("/api/auth/oidc/config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.enabled === "boolean") {
+          setOidc({
+            enabled: data.enabled,
+            providerName: data.providerName || "Single Sign-On",
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -142,6 +164,23 @@ export default function LoginPage() {
           </div>
 
           {/* Quick Role Switcher Cards */}
+          {oidc.enabled && (
+            <div className="space-y-4">
+              <a
+                href="/api/auth/oidc/login"
+                className="w-full py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 border border-cyan-500/50 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                <KeyRound className="w-4 h-4 text-cyan-400" />
+                Sign in with {oidc.providerName} (OIDC)
+              </a>
+              <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-slate-500">
+                <span className="h-px flex-1 bg-slate-800" />
+                <span>Or local operator credentials</span>
+                <span className="h-px flex-1 bg-slate-800" />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
