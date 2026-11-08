@@ -4,6 +4,8 @@ Racker is a Datacenter Infrastructure Management (DCIM) web app for mapping faci
 
 It runs entirely in Docker. There is no host Node.js install to manage.
 
+![screenshot of main ui](docs/image.png)
+
 ## What it covers
 
 - **Spatial hierarchy** from site → building → floor → room → row → rack, with 2D and 3D floor plans
