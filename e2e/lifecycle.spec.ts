@@ -35,34 +35,40 @@ test.describe("infrastructure lifecycle", () => {
     await page.getByRole("button", { name: "New Site" }).click();
     await submitHierarchy(page, "SITE", siteName, siteCode);
 
-    await page
+    const tree = page.getByRole("navigation", { name: "Locations" });
+
+    await tree
       .getByText(siteName, { exact: true })
-      .locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]')
+      .locator("xpath=..")
       .getByRole("button", { name: "+ Bldg" })
       .click();
     await submitHierarchy(page, "BUILDING", buildingName, buildingCode);
 
-    await page
+    await tree
       .getByText(`${buildingName} (${buildingCode})`, { exact: true })
       .locator("xpath=..")
       .getByRole("button", { name: "+ Floor" })
       .click();
     await submitHierarchy(page, "FLOOR", floorName);
 
-    await page.getByText(floorName, { exact: false }).locator("xpath=..").getByRole("button", { name: "+ Room" }).click();
+    await tree
+      .getByText(floorName, { exact: false })
+      .locator("xpath=..")
+      .getByRole("button", { name: "+ Room" })
+      .click();
     await submitHierarchy(page, "ROOM", roomName, roomCode);
 
-    await page.getByRole("button", { name: roomName }).first().click();
+    await tree.getByRole("button", { name: roomName, exact: true }).click();
     await page.getByRole("button", { name: `Add Row in ${roomCode}` }).click();
     await submitHierarchy(page, "ROW", rowName);
 
-    await page
+    await tree
       .getByText(rowName, { exact: true })
       .locator("xpath=..")
       .getByRole("button", { name: "+ Rack" })
       .click();
     await submitHierarchy(page, "RACK", rackName, rackCode);
-    await expect(page.getByRole("link", { name: new RegExp(rackCode) }).first()).toBeVisible();
+    await expect(tree.getByRole("link", { name: new RegExp(rackCode) }).first()).toBeVisible();
   });
 
   test("creates a supply, panel, floor whips, and cooling unit", async ({ page }) => {
