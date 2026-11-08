@@ -74,14 +74,14 @@ test.describe("infrastructure lifecycle", () => {
   test("creates a supply, panel, floor whips, and cooling unit", async ({ page }) => {
     await page.goto("/power-cooling");
 
-    await page.getByRole("button", { name: "Add supply" }).click();
+    await page.getByRole("button", { name: "Add supply" }).first().click();
     const supply = page.locator("form").filter({ hasText: "Add supply" });
     await supply.getByLabel("Site").selectOption({ label: siteCode });
     await supply.getByPlaceholder("Name").fill(sourceName);
     await supply.getByRole("button", { name: "Add supply" }).click();
     await expect(page.getByRole("heading", { name: sourceName })).toBeVisible();
 
-    await page.getByRole("button", { name: "Add panel" }).click();
+    await page.getByRole("button", { name: "Add panel" }).first().click();
     const panel = page.locator("form").filter({ has: page.getByPlaceholder("Panel name") });
     await panel.getByPlaceholder("Panel name").fill(panelName);
     await panel.getByLabel("Room").selectOption({ label: roomName });
@@ -96,7 +96,8 @@ test.describe("infrastructure lifecycle", () => {
     await whipRow.locator("select").selectOption("L3");
     await expect(whipRow.locator("select")).toHaveValue("L3");
 
-    await page.getByRole("button", { name: "Add cooling unit" }).click();
+    await page.goto("/cooling");
+    await page.getByRole("button", { name: "Add cooling unit" }).first().click();
     const cooling = page.locator("form").filter({ has: page.getByPlaceholder("Unit name") });
     await cooling.getByPlaceholder("Unit name").fill(coolingName);
     await cooling.getByLabel("Room").selectOption({ label: roomName });
@@ -164,7 +165,7 @@ async function cordPsu(page: Page, psuName: string, pduName: string, outletNo: n
 }
 
 async function addWhip(page: Page, label: string, phase: string) {
-  await page.getByRole("button", { name: "Add socket" }).click();
+  await page.getByRole("button", { name: "Add socket" }).first().click();
   const form = page.locator("form").filter({ has: page.getByPlaceholder("Whip name") });
   await form.getByPlaceholder("Whip name").fill(label);
   await form.getByPlaceholder("Floor socket label").fill(label);

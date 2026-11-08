@@ -414,7 +414,7 @@ export default async function ExecutiveDashboardPage() {
                 </p>
               </div>
               <Link
-                href="/power-cooling"
+                href="/cooling"
                 className="text-xs text-cyan-400 hover:underline"
               >
                 Cooling Plant

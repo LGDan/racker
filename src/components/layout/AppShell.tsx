@@ -16,6 +16,7 @@ import {
   Server,
   Settings2,
   ShieldCheck,
+  ThermometerSnowflake,
   UserCheck,
   Users,
   Zap,
@@ -121,10 +122,17 @@ function ShellFrame({ user, firstRackId, children }: AppShellProps) {
     },
     {
       label: "Power",
-      title: "Power Chain & Cooling",
+      title: "Electrical Power Chain",
       href: "/power-cooling",
       icon: Zap,
       active: pathname.startsWith("/power-cooling"),
+    },
+    {
+      label: "Cooling",
+      title: "Cooling & Thermal Plant",
+      href: "/cooling",
+      icon: ThermometerSnowflake,
+      active: pathname.startsWith("/cooling"),
     },
     {
       label: "Diagrams",
