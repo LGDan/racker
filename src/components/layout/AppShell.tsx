@@ -19,6 +19,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 import { LocationTree } from "./LocationTree";
 import {
   firstRackInRoom,
@@ -175,6 +176,7 @@ function ShellFrame({ user, firstRackId, children }: AppShellProps) {
             })}
           </div>
         </nav>
+        <ThemeToggle />
         {user.role === "ADMIN" && <AdminMenu pathname={pathname} />}
         <AccountMenu user={user} />
       </header>

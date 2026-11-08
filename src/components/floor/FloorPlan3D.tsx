@@ -4,6 +4,8 @@ import React, { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { FloorLayer, FloorRack, FloorRoom, FloorSocket } from "./FloorPlan";
+import { useTheme } from "@/components/layout/ThemeToggle";
+import { floorTilePaint } from "./tile-theme";
 
 const TILE = 0.6;
 const U_METERS = 0.04445;
@@ -180,6 +182,7 @@ export function FloorPlan3D({
 
   const floorActive = activeLayer === "FLOOR";
   const rackActive = activeLayer === "RACK";
+  const tiles = floorTilePaint(useTheme());
 
   return (
     <div className="h-[560px] rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
@@ -187,7 +190,7 @@ export function FloorPlan3D({
         camera={{ position: [cols * 0.22, 1.7, rows * 0.42], fov: 42 }}
         onCreated={({ camera }) => camera.lookAt(0, 0.9, 0)}
       >
-        <color attach="background" args={["#020617"]} />
+        <color attach="background" args={[tiles.scene]} />
         <ambientLight intensity={0.7} />
         <directionalLight position={[4, 8, 6]} intensity={1.15} />
         <directionalLight position={[0, 2, 5]} intensity={0.45} />
@@ -206,7 +209,7 @@ export function FloorPlan3D({
                   <mesh position={[0, -0.02, 0]}>
                     <boxGeometry args={[0.58, 0.02, 0.58]} />
                     <meshStandardMaterial
-                      color="#0f172a"
+                      color={tiles.grillPlate}
                       transparent
                       opacity={fade}
                       roughness={0.9}
@@ -219,7 +222,7 @@ export function FloorPlan3D({
                     >
                       <boxGeometry args={[0.035, 0.02, 0.5]} />
                       <meshStandardMaterial
-                        color="#22d3ee"
+                        color={tiles.grillBar}
                         transparent
                         opacity={fade}
                         roughness={0.45}
@@ -233,7 +236,7 @@ export function FloorPlan3D({
               <mesh key={`floor-${posX}-${posY}`} position={[x, -0.02, z]}>
                 <boxGeometry args={[0.58, 0.04, 0.58]} />
                 <meshStandardMaterial
-                  color="#1e293b"
+                  color={tiles.slab}
                   transparent
                   opacity={fade}
                   roughness={0.85}

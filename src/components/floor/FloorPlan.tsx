@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Box, Layers, Pencil } from "lucide-react";
+import { useTheme } from "@/components/layout/ThemeToggle";
+import { floorTilePaint } from "./tile-theme";
 
 export type FloorLayer = "UNDERFLOOR" | "FLOOR" | "RACK" | "OVERHEAD";
 export type HeatmapMode = "POWER_KW" | "U_SPACE" | "REDUNDANCY";
@@ -159,6 +161,7 @@ export function FloorPlan({
   const gridRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const router = useRouter();
+  const tiles = floorTilePaint(useTheme());
 
   useEffect(() => {
     setCols(room.gridCols);
@@ -425,8 +428,7 @@ export function FloorPlan({
             <span
               className="w-3 h-3 rounded-sm border border-slate-400"
               style={{
-                backgroundImage:
-                  "repeating-linear-gradient(-45deg, #94a3b8 0 1px, #334155 1px 3px)",
+                backgroundImage: tiles.legendObstruct,
               }}
             />
             Obstructed
@@ -435,8 +437,7 @@ export function FloorPlan({
             <span
               className="w-3 h-3 rounded-sm border border-cyan-400"
               style={{
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, #22d3ee 0 1px, transparent 1px 3px)",
+                backgroundImage: tiles.legendGrill,
               }}
             />
             Grill
@@ -552,11 +553,11 @@ export function FloorPlan({
                         style={{
                           background: grill
                             ? floorFocus
-                              ? "repeating-linear-gradient(90deg, rgba(34,211,238,0.85) 0 3px, rgba(8,47,73,0.95) 3px 10px)"
-                              : "repeating-linear-gradient(90deg, rgba(34,211,238,0.28) 0 2px, rgba(15,23,42,0.95) 2px 8px)"
+                              ? tiles.grillFocus
+                              : tiles.grill
                             : floorFocus
-                            ? "#0f172a"
-                            : "#020617",
+                            ? tiles.blankFocus
+                            : tiles.blank,
                         }}
                         aria-label={`Tile ${x},${y}${blocked ? " obstructed" : ""}${
                           grill ? " grill" : " solid"
@@ -569,8 +570,8 @@ export function FloorPlan({
                             } pointer-events-none`}
                             style={{
                               backgroundImage: rackFocus
-                                ? "repeating-linear-gradient(-45deg, rgba(148,163,184,0.95) 0 3px, rgba(30,41,59,0.96) 3px 8px)"
-                                : "repeating-linear-gradient(-45deg, rgba(148,163,184,0.45) 0 2px, transparent 2px 7px)",
+                                ? tiles.obstructFocus
+                                : tiles.obstruct,
                             }}
                           >
                             {rackFocus

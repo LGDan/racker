@@ -13,6 +13,7 @@ import {
   Layers,
   ThermometerSnowflake,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,6 +59,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col lg:flex-row">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       {/* Left Branding & Telemetry Showcase */}
       <div className="lg:w-7/12 p-8 lg:p-16 flex flex-col justify-between bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 relative overflow-hidden">
         <div className="relative z-10">
