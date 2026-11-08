@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { getFullInfrastructureSnapshot } from "@/lib/capacity-engine";
+import { OverviewRackTable } from "@/components/dashboard/OverviewRackTable";
 import {
   Building2,
   Server,
@@ -9,7 +10,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   PlugZap,
-  CheckCircle2,
   Layers,
   Activity,
 } from "lucide-react";
@@ -296,102 +296,7 @@ export default async function ExecutiveDashboardPage() {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-950/50">
-                  <th className="py-3 px-4">Rack</th>
-                  <th className="py-3 px-4">Location</th>
-                  <th className="py-3 px-4">U Consumed</th>
-                  <th className="py-3 px-4">Power Draw (A/B)</th>
-                  <th className="py-3 px-4">PDU Sockets</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/70 text-xs">
-                {racks.map((rack) => (
-                  <tr
-                    key={rack.id}
-                    className="hover:bg-slate-800/40 transition-colors"
-                  >
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-white flex items-center gap-1.5">
-                        {rack.code}
-                        {rack.spofDeviceCount > 0 ? (
-                          <span
-                            title={`${rack.spofDeviceCount} single-corded device(s)`}
-                            className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          >
-                            SPOF
-                          </span>
-                        ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-400 truncate max-w-[160px]">
-                        {rack.name}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="text-slate-200 font-medium">
-                        {rack.siteCode}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        {rack.roomName}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-slate-200">
-                          {rack.usedU}/{rack.totalU}U
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {rack.freeU}U free
-                        </span>
-                      </div>
-                      <div className="w-24 h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full bg-cyan-400"
-                          style={{ width: `${Math.min(100, rack.uUtilizationPct)}%` }}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-mono text-white font-semibold">
-                        {(rack.currentPowerWatts / 1000).toFixed(2)} kW{" "}
-                        <span className="text-[11px] font-normal text-slate-400">
-                          / {(rack.maxPowerWatts / 1000).toFixed(0)}kW
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        <span className="text-blue-400">
-                          A: {rack.feedAWatts}W
-                        </span>{" "}
-                        •{" "}
-                        <span className="text-amber-400">
-                          B: {rack.feedBWatts}W
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-1 rounded bg-slate-800 text-slate-200 font-mono text-[11px]">
-                        {rack.freeOutlets} free / {rack.totalOutlets}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <Link
-                        href={`/racks/${rack.id}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 font-medium transition-colors"
-                      >
-                        Open Rack
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OverviewRackTable racks={racks} />
         </div>
 
         {/* Right Column: 3-Phase Distribution Panels & Room Cooling (5 cols) */}

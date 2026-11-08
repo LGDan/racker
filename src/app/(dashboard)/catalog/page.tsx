@@ -19,10 +19,12 @@ import {
   ModalFooter,
   PageHeader,
   SectionCard,
+  SortHeader,
   btnPrimary,
   btnSecondary,
   inputClass,
   tableClasses,
+  useTableSort,
 } from "@/components/ui/primitives";
 
 interface Appliance {
@@ -86,6 +88,22 @@ export default function CatalogPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const catalogSort = useTableSort(
+    appliances,
+    {
+      name: (item) => applianceLabel(item),
+      deviceType: (item) => item.deviceType,
+      uHeight: (item) => item.uHeight,
+      defaultWatts: (item) => item.defaultWatts,
+      btuPerHour: (item) => heatBtu(item),
+      psuCount: (item) => item.psuCount,
+      psuPlugType: (item) => item.psuPlugType,
+      portCount: (item) => item.portCount,
+      installedCount: (item) => item.installedCount,
+    },
+    "name"
+  );
 
   async function load() {
     const res = await fetch("/api/catalog");
@@ -291,20 +309,20 @@ export default function CatalogPage() {
             <table className={tableClasses.table}>
               <thead className={tableClasses.thead}>
                 <tr>
-                  <th className={tableClasses.th}>Name</th>
-                  <th className={tableClasses.th}>Type</th>
-                  <th className={tableClasses.th}>Height</th>
-                  <th className={tableClasses.th}>Watts</th>
-                  <th className={tableClasses.th}>BTU/h</th>
-                  <th className={tableClasses.th}>PSUs</th>
-                  <th className={tableClasses.th}>Plug</th>
-                  <th className={tableClasses.th}>Ports</th>
-                  <th className={tableClasses.th}>Installed</th>
+                  <SortHeader label="Name" column="name" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="Type" column="deviceType" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="Height" column="uHeight" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="Watts" column="defaultWatts" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="BTU/h" column="btuPerHour" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="PSUs" column="psuCount" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="Plug" column="psuPlugType" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="Ports" column="portCount" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
+                  <SortHeader label="Installed" column="installedCount" sortKey={catalogSort.sortKey} sortDir={catalogSort.sortDir} onSort={catalogSort.toggleSort} />
                   <th className={tableClasses.thRight}> </th>
                 </tr>
               </thead>
               <tbody className={tableClasses.tbody}>
-                {appliances.map((item) => (
+                {catalogSort.sorted.map((item) => (
                   <tr key={item.id} className={tableClasses.tr}>
                     <td className={tableClasses.td}>
                       <div className="font-semibold text-white">{applianceLabel(item)}</div>

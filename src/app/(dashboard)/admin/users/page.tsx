@@ -9,11 +9,13 @@ import {
   ModalFooter,
   PageHeader,
   SectionCard,
+  SortHeader,
   btnPrimary,
   btnSecondary,
   compactInputClass,
   inputClass,
   tableClasses,
+  useTableSort,
 } from "@/components/ui/primitives";
 
 interface UserRow {
@@ -44,6 +46,28 @@ export default function AdminUsersPage() {
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [form, setForm] = useState({ name: "", email: "", password: "changeme", role: "STANDARD" });
+
+  const usersSort = useTableSort(
+    users,
+    {
+      name: (u) => u.name,
+      role: (u) => u.role,
+      active: (u) => u.active,
+    },
+    "name"
+  );
+
+  const auditSort = useTableSort(
+    audit,
+    {
+      action: (r) => r.action,
+      details: (r) => r.details || r.entityType,
+      operator: (r) => r.user?.name || "system",
+      timestamp: (r) => new Date(r.createdAt).getTime(),
+    },
+    "timestamp",
+    "desc"
+  );
 
   async function load() {
     const res = await fetch("/api/users");
@@ -119,14 +143,14 @@ export default function AdminUsersPage() {
           <table className={tableClasses.table}>
             <thead className={tableClasses.thead}>
               <tr>
-                <th className={tableClasses.th}>Person</th>
-                <th className={tableClasses.th}>Role</th>
-                <th className={tableClasses.th}>State</th>
+                <SortHeader label="Person" column="name" sortKey={usersSort.sortKey} sortDir={usersSort.sortDir} onSort={usersSort.toggleSort} />
+                <SortHeader label="Role" column="role" sortKey={usersSort.sortKey} sortDir={usersSort.sortDir} onSort={usersSort.toggleSort} />
+                <SortHeader label="State" column="active" sortKey={usersSort.sortKey} sortDir={usersSort.sortDir} onSort={usersSort.toggleSort} />
                 <th className={tableClasses.thRight}>Password</th>
               </tr>
             </thead>
             <tbody className={tableClasses.tbody}>
-              {users.map((user) => (
+              {usersSort.sorted.map((user) => (
                 <tr key={user.id} className={tableClasses.tr}>
                   <td className={tableClasses.td}>
                     <div className="font-semibold text-white">{user.name}</div>
@@ -190,14 +214,14 @@ export default function AdminUsersPage() {
           <table className={tableClasses.table}>
             <thead className={tableClasses.thead}>
               <tr>
-                <th className={tableClasses.th}>Action</th>
-                <th className={tableClasses.th}>Details</th>
-                <th className={tableClasses.th}>Operator</th>
-                <th className={tableClasses.thRight}>Timestamp</th>
+                <SortHeader label="Action" column="action" sortKey={auditSort.sortKey} sortDir={auditSort.sortDir} onSort={auditSort.toggleSort} />
+                <SortHeader label="Details" column="details" sortKey={auditSort.sortKey} sortDir={auditSort.sortDir} onSort={auditSort.toggleSort} />
+                <SortHeader label="Operator" column="operator" sortKey={auditSort.sortKey} sortDir={auditSort.sortDir} onSort={auditSort.toggleSort} />
+                <SortHeader label="Timestamp" column="timestamp" align="right" sortKey={auditSort.sortKey} sortDir={auditSort.sortDir} onSort={auditSort.toggleSort} />
               </tr>
             </thead>
             <tbody className={tableClasses.tbody}>
-              {audit.map((row) => (
+              {auditSort.sorted.map((row) => (
                 <tr key={row.id} className={tableClasses.tr}>
                   <td className={`${tableClasses.td} font-semibold text-cyan-300`}>{row.action}</td>
                   <td className={`${tableClasses.td} text-slate-200`}>{row.details || row.entityType}</td>

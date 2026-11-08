@@ -3,7 +3,15 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
-import { PageHeader, SectionCard, btnPrimary, btnSecondary, tableClasses } from "@/components/ui/primitives";
+import {
+  PageHeader,
+  SectionCard,
+  SortHeader,
+  btnPrimary,
+  btnSecondary,
+  tableClasses,
+  useTableSort,
+} from "@/components/ui/primitives";
 
 interface Capacity {
   totals: {
@@ -115,6 +123,41 @@ function download(name: string, rows: unknown[][]) {
 
 export default function ReportsPage() {
   const [capacity, setCapacity] = useState<Capacity | null>(null);
+
+  const racksSort = useTableSort(
+    capacity?.racks ?? [],
+    {
+      code: (r) => r.code,
+      usedU: (r) => r.usedU,
+      power: (r) => r.currentPowerWatts,
+      sockets: (r) => r.freeOutlets,
+      redundancy: (r) => r.spofDeviceCount,
+    },
+    "code"
+  );
+
+  const pdusSort = useTableSort(
+    capacity?.pdus ?? [],
+    {
+      name: (p) => p.name,
+      rack: (p) => `${p.rackCode} ${p.feedSide}`,
+      whip: (p) => p.floorSocketLabel ?? "",
+      load: (p) => p.loadPct,
+      sockets: (p) => p.freeOutlets,
+    },
+    "name"
+  );
+
+  const suppliesSort = useTableSort(
+    capacity?.powerSources ?? [],
+    {
+      name: (s) => s.name,
+      type: (s) => `${s.sourceType} ${s.redundancyGroup}`,
+      power: (s) => s.loadKw,
+      current: (s) => s.loadAmps,
+    },
+    "name"
+  );
 
   useEffect(() => {
     fetch("/api/infrastructure").then(async (res) => {
@@ -238,15 +281,15 @@ export default function ReportsPage() {
           <table className={tableClasses.table}>
             <thead className={tableClasses.thead}>
               <tr>
-                <th className={tableClasses.th}>Rack</th>
-                <th className={tableClasses.th}>U</th>
-                <th className={tableClasses.th}>Power</th>
-                <th className={tableClasses.th}>Sockets</th>
-                <th className={tableClasses.th}>Redundancy</th>
+                <SortHeader label="Rack" column="code" sortKey={racksSort.sortKey} sortDir={racksSort.sortDir} onSort={racksSort.toggleSort} />
+                <SortHeader label="U" column="usedU" sortKey={racksSort.sortKey} sortDir={racksSort.sortDir} onSort={racksSort.toggleSort} />
+                <SortHeader label="Power" column="power" sortKey={racksSort.sortKey} sortDir={racksSort.sortDir} onSort={racksSort.toggleSort} />
+                <SortHeader label="Sockets" column="sockets" sortKey={racksSort.sortKey} sortDir={racksSort.sortDir} onSort={racksSort.toggleSort} />
+                <SortHeader label="Redundancy" column="redundancy" sortKey={racksSort.sortKey} sortDir={racksSort.sortDir} onSort={racksSort.toggleSort} />
               </tr>
             </thead>
             <tbody className={tableClasses.tbody}>
-              {capacity.racks.map((r) => (
+              {racksSort.sorted.map((r) => (
                 <tr key={r.id} className={tableClasses.tr}>
                   <td className={tableClasses.td}>
                     <Link href={`/racks/${r.id}`} className="font-semibold text-cyan-300 hover:underline">
@@ -283,15 +326,15 @@ export default function ReportsPage() {
             <table className={tableClasses.table}>
               <thead className={tableClasses.thead}>
                 <tr>
-                  <th className={tableClasses.th}>PDU</th>
-                  <th className={tableClasses.th}>Rack / Feed</th>
-                  <th className={tableClasses.th}>Whip</th>
-                  <th className={tableClasses.th}>Load</th>
-                  <th className={tableClasses.thRight}>Free sockets</th>
+                  <SortHeader label="PDU" column="name" sortKey={pdusSort.sortKey} sortDir={pdusSort.sortDir} onSort={pdusSort.toggleSort} />
+                  <SortHeader label="Rack / Feed" column="rack" sortKey={pdusSort.sortKey} sortDir={pdusSort.sortDir} onSort={pdusSort.toggleSort} />
+                  <SortHeader label="Whip" column="whip" sortKey={pdusSort.sortKey} sortDir={pdusSort.sortDir} onSort={pdusSort.toggleSort} />
+                  <SortHeader label="Load" column="load" sortKey={pdusSort.sortKey} sortDir={pdusSort.sortDir} onSort={pdusSort.toggleSort} />
+                  <SortHeader label="Free sockets" column="sockets" align="right" sortKey={pdusSort.sortKey} sortDir={pdusSort.sortDir} onSort={pdusSort.toggleSort} />
                 </tr>
               </thead>
               <tbody className={tableClasses.tbody}>
-                {capacity.pdus.map((p) => (
+                {pdusSort.sorted.map((p) => (
                   <tr key={p.id} className={tableClasses.tr}>
                     <td className={`${tableClasses.td} font-semibold text-white`}>{p.name}</td>
                     <td className={tableClasses.td}>
@@ -344,14 +387,14 @@ export default function ReportsPage() {
               <table className={tableClasses.table}>
                 <thead className={tableClasses.thead}>
                   <tr>
-                    <th className={tableClasses.th}>Supply</th>
-                    <th className={tableClasses.th}>Type / Bus</th>
-                    <th className={tableClasses.th}>Power</th>
-                    <th className={tableClasses.thRight}>Current</th>
+                    <SortHeader label="Supply" column="name" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Type / Bus" column="type" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Power" column="power" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Current" column="current" align="right" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
                   </tr>
                 </thead>
                 <tbody className={tableClasses.tbody}>
-                  {capacity.powerSources.map((s) => (
+                  {suppliesSort.sorted.map((s) => (
                     <tr key={s.name} className={tableClasses.tr}>
                       <td className={`${tableClasses.td} font-semibold text-white`}>{s.name}</td>
                       <td className={tableClasses.td}>

@@ -1,4 +1,89 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+
+export type SortDir = "asc" | "desc";
+
+export function useTableSort<T>(
+  rows: readonly T[],
+  getters: Record<string, (row: T) => string | number | boolean | null | undefined>,
+  defaultKey?: string,
+  defaultDir: SortDir = "asc"
+) {
+  const [sortKey, setSortKey] = useState<string | null>(defaultKey ?? null);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
+
+  function toggleSort(key: string) {
+    if (sortKey === key) {
+      setSortDir((current) => (current === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sorted = useMemo(() => {
+    if (!sortKey || !getters[sortKey]) return [...rows];
+    const get = getters[sortKey];
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const va = get(a);
+      const vb = get(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === "number" && typeof vb === "number") {
+        return (va - vb) * dir;
+      }
+      if (typeof va === "boolean" && typeof vb === "boolean") {
+        return (Number(va) - Number(vb)) * dir;
+      }
+      return (
+        String(va).localeCompare(String(vb), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }) * dir
+      );
+    });
+  }, [rows, getters, sortKey, sortDir]);
+
+  return { sorted, sortKey, sortDir, toggleSort };
+}
+
+export function SortHeader({
+  label,
+  column,
+  sortKey,
+  sortDir,
+  onSort,
+  align = "left",
+}: {
+  label: React.ReactNode;
+  column: string;
+  sortKey: string | null;
+  sortDir: SortDir;
+  onSort: (column: string) => void;
+  align?: "left" | "right";
+}) {
+  const active = sortKey === column;
+  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      className={align === "right" ? tableClasses.thRight : tableClasses.th}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wider transition-colors hover:text-white ${
+          active ? "text-cyan-300" : "text-slate-400"
+        } ${align === "right" ? "ml-auto" : ""}`}
+      >
+        <span>{label}</span>
+        <Icon className={`h-3 w-3 shrink-0 ${active ? "text-cyan-400" : "opacity-50"}`} />
+      </button>
+    </th>
+  );
+}
 
 export const inputClass =
   "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white";

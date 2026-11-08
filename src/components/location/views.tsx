@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
-import { SectionCard, tableClasses } from "@/components/ui/primitives";
+import { SectionCard, SortHeader, tableClasses, useTableSort } from "@/components/ui/primitives";
 import { LocationFrame, Meter } from "./LocationFrame";
 import { LocationMediaGallery } from "./LocationMedia";
 import {
@@ -30,6 +30,19 @@ export function SiteView({ siteId }: { siteId: string }) {
     "site",
     siteId
   );
+  const siteSupplies = powerSources.filter((source) => source.siteId === siteId);
+  const suppliesSort = useTableSort(
+    siteSupplies,
+    {
+      name: (s) => s.name,
+      type: (s) => supplyTypeLabel(s.sourceType),
+      group: (s) => s.redundancyGroup,
+      status: (s) => s.status,
+      capacity: (s) => s.capacityKw,
+      load: (s) => s.loadKw,
+    },
+    "name"
+  );
   if (loading && sites.length === 0) {
     return <div className="p-8 text-sm text-slate-400">Loading location…</div>;
   }
@@ -46,10 +59,7 @@ export function SiteView({ siteId }: { siteId: string }) {
     site.utilityCapacityKw > 0
       ? Math.round((rollup.itKw / site.utilityCapacityKw) * 1000) / 10
       : 0;
-  const supplies = powerSources
-    .filter((source) => source.siteId === site.id)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const supplies = suppliesSort.sorted;
 
   return (
     <LocationFrame
@@ -127,12 +137,12 @@ export function SiteView({ siteId }: { siteId: string }) {
               <table className={tableClasses.table}>
                 <thead className={tableClasses.thead}>
                   <tr>
-                    <th className={tableClasses.th}>Name</th>
-                    <th className={tableClasses.th}>Type</th>
-                    <th className={tableClasses.th}>Group</th>
-                    <th className={tableClasses.th}>Status</th>
-                    <th className={tableClasses.th}>Capacity</th>
-                    <th className={tableClasses.th}>Load</th>
+                    <SortHeader label="Name" column="name" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Type" column="type" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Group" column="group" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Status" column="status" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Capacity" column="capacity" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
+                    <SortHeader label="Load" column="load" sortKey={suppliesSort.sortKey} sortDir={suppliesSort.sortDir} onSort={suppliesSort.toggleSort} />
                   </tr>
                 </thead>
                 <tbody className={tableClasses.tbody}>

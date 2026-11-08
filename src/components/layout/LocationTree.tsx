@@ -3,7 +3,17 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, PanelLeftClose, Search } from "lucide-react";
+import {
+  Building2,
+  ChevronRight,
+  Columns3,
+  Globe,
+  Grid2x2,
+  Layers,
+  PanelLeftClose,
+  Search,
+  Server,
+} from "lucide-react";
 import {
   useInfrastructure,
   type TreeBuilding,
@@ -149,6 +159,7 @@ export function LocationTree({
                   open={isOpen(site.id)}
                   onClick={() => toggle(site.id)}
                 />
+                <Globe className="h-3.5 w-3.5 shrink-0 text-cyan-400" aria-hidden="true" />
                 <Link
                   href={`/sites/${site.id}`}
                   aria-current={site.id === siteId ? "page" : undefined}
@@ -180,6 +191,7 @@ export function LocationTree({
                           open={isOpen(building.id)}
                           onClick={() => toggle(building.id)}
                         />
+                        <Building2 className="h-3.5 w-3.5 shrink-0 text-sky-400" aria-hidden="true" />
                         <Link
                           href={`/buildings/${building.id}`}
                           aria-current={building.id === buildingId ? "page" : undefined}
@@ -210,6 +222,7 @@ export function LocationTree({
                                   open={isOpen(floor.id)}
                                   onClick={() => toggle(floor.id)}
                                 />
+                                <Layers className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden="true" />
                                 <Link
                                   href={`/floors/${floor.id}`}
                                   aria-current={floor.id === floorId ? "page" : undefined}
@@ -247,6 +260,7 @@ export function LocationTree({
                                             open={isOpen(room.id)}
                                             onClick={() => toggle(room.id)}
                                           />
+                                          <Grid2x2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
                                           <button
                                             type="button"
                                             onClick={() => selectRoom(room.id)}
@@ -271,6 +285,7 @@ export function LocationTree({
                                                     open={isOpen(row.id)}
                                                     onClick={() => toggle(row.id)}
                                                   />
+                                                  <Columns3 className="h-3.5 w-3.5 shrink-0 text-violet-400" aria-hidden="true" />
                                                   <Link
                                                     href={`/rows/${row.id}`}
                                                     aria-current={row.id === rowId ? "page" : undefined}
@@ -308,6 +323,12 @@ export function LocationTree({
                                                                 : "text-slate-300 hover:bg-slate-800"
                                                             }`}
                                                           >
+                                                            <Server
+                                                              className={`h-3 w-3 shrink-0 ${
+                                                                rackSelected ? "text-cyan-400" : "text-slate-500"
+                                                              }`}
+                                                              aria-hidden="true"
+                                                            />
                                                             <span>{rack.code}</span>
                                                             <span className="truncate font-sans text-[10px] text-slate-500">
                                                               {rack.name}

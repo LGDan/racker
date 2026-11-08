@@ -11,9 +11,11 @@ import {
   Modal,
   ModalFooter,
   SectionCard,
+  SortHeader,
   btnPrimary,
   inputClass,
   tableClasses,
+  useTableSort,
 } from "@/components/ui/primitives";
 import { floorTilePaint } from "./tile-theme";
 
@@ -906,6 +908,13 @@ function CoolingRegister({
     return a.name.localeCompare(b.name);
   });
   const offPlan = units.filter((unit) => !onPlan(unit.posX, unit.posY));
+  const unitsSort = useTableSort(units, {
+    name: (u) => u.name,
+    unitType: (u) => u.unitType,
+    capacityKw: (u) => u.capacityKw,
+    status: (u) => u.status,
+    location: (u) => (onPlan(u.posX, u.posY) ? `Tile ${u.posX},${u.posY}` : "0 Not on this plan"),
+  });
 
   return (
     <SectionCard
@@ -932,23 +941,23 @@ function CoolingRegister({
         <table className={tableClasses.table}>
           <thead className={tableClasses.thead}>
             <tr>
-              <th className={tableClasses.th}>Name</th>
-              <th className={tableClasses.th}>Type</th>
-              <th className={tableClasses.th}>Capacity</th>
-              <th className={tableClasses.th}>Status</th>
-              <th className={tableClasses.th}>Location</th>
+              <SortHeader label="Name" column="name" sortKey={unitsSort.sortKey} sortDir={unitsSort.sortDir} onSort={unitsSort.toggleSort} />
+              <SortHeader label="Type" column="unitType" sortKey={unitsSort.sortKey} sortDir={unitsSort.sortDir} onSort={unitsSort.toggleSort} />
+              <SortHeader label="Capacity" column="capacityKw" sortKey={unitsSort.sortKey} sortDir={unitsSort.sortDir} onSort={unitsSort.toggleSort} />
+              <SortHeader label="Status" column="status" sortKey={unitsSort.sortKey} sortDir={unitsSort.sortDir} onSort={unitsSort.toggleSort} />
+              <SortHeader label="Location" column="location" sortKey={unitsSort.sortKey} sortDir={unitsSort.sortDir} onSort={unitsSort.toggleSort} />
               {editing && <th className={tableClasses.thRight}> </th>}
             </tr>
           </thead>
           <tbody className={tableClasses.tbody}>
-            {units.length === 0 && (
+            {unitsSort.sorted.length === 0 && (
               <tr>
                 <td colSpan={editing ? 6 : 5} className="px-4 py-3 text-slate-500">
                   No cooling units serve this room yet.
                 </td>
               </tr>
             )}
-            {units.map((unit) => {
+            {unitsSort.sorted.map((unit) => {
               const placed = onPlan(unit.posX, unit.posY);
               return (
                 <tr key={unit.id} className={tableClasses.tr}>
@@ -1082,6 +1091,16 @@ function GrillRegister({
   onRemove: (x: number, y: number) => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const grillsSort = useTableSort(
+    grills,
+    {
+      tile: (key) => {
+        const [x, y] = key.split(",").map(Number);
+        return y * 1000 + x;
+      },
+    },
+    "tile"
+  );
 
   return (
     <SectionCard
@@ -1104,19 +1123,19 @@ function GrillRegister({
         <table className={tableClasses.table}>
           <thead className={tableClasses.thead}>
             <tr>
-              <th className={tableClasses.th}>Tile</th>
+              <SortHeader label="Tile" column="tile" sortKey={grillsSort.sortKey} sortDir={grillsSort.sortDir} onSort={grillsSort.toggleSort} />
               {editing && <th className={tableClasses.thRight}> </th>}
             </tr>
           </thead>
           <tbody className={tableClasses.tbody}>
-            {grills.length === 0 && (
+            {grillsSort.sorted.length === 0 && (
               <tr>
                 <td colSpan={editing ? 2 : 1} className="px-4 py-3 text-slate-500">
                   This room has no airflow grills.
                 </td>
               </tr>
             )}
-            {grills.map((key) => {
+            {grillsSort.sorted.map((key) => {
               const [x, y] = key.split(",");
               return (
                 <tr key={key} className={tableClasses.tr}>

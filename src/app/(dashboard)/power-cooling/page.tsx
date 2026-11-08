@@ -9,10 +9,12 @@ import {
   ModalFooter,
   PageHeader,
   SectionCard,
+  SortHeader,
   btnPrimary,
   compactInputClass,
   inputClass,
   tableClasses,
+  useTableSort,
 } from "@/components/ui/primitives";
 
 interface Snapshot {
@@ -80,6 +82,42 @@ export default function PowerCoolingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const panelsSort = useTableSort(
+    snap?.powerPanels ?? [],
+    {
+      name: (p) => p.name,
+      room: (p) => p.room.name,
+      upstream: (p) => p.upstreamSource.name,
+      rating: (p) => p.maxAmpsPerPhase,
+      breakers: (p) => p.circuits.length,
+    },
+    "name"
+  );
+
+  const socketsSort = useTableSort(
+    snap?.powerCircuits ?? [],
+    {
+      socket: (c) => c.floorSocketLabel,
+      panel: (c) => c.panel.name,
+      connector: (c) => c.ratedAmps,
+      rack: (c) => c.rack?.code ?? "",
+      phase: (c) => c.phaseAllocation,
+    },
+    "socket"
+  );
+
+  const coolingSort = useTableSort(
+    coolingUnits,
+    {
+      name: (cu) => cu.name,
+      unitType: (cu) => cu.unitType,
+      capacityKw: (cu) => cu.capacityKw,
+      roomName: (cu) => cu.roomName,
+      status: (cu) => cu.status,
+    },
+    "name"
+  );
 
   async function load() {
     const res = await fetch("/api/infrastructure");
@@ -245,15 +283,15 @@ export default function PowerCoolingPage() {
             <table className={tableClasses.table}>
               <thead className={tableClasses.thead}>
                 <tr>
-                  <th className={tableClasses.th}>Panel</th>
-                  <th className={tableClasses.th}>Room</th>
-                  <th className={tableClasses.th}>Upstream</th>
-                  <th className={tableClasses.th}>Rating</th>
-                  <th className={tableClasses.th}>Breakers</th>
+                  <SortHeader label="Panel" column="name" sortKey={panelsSort.sortKey} sortDir={panelsSort.sortDir} onSort={panelsSort.toggleSort} />
+                  <SortHeader label="Room" column="room" sortKey={panelsSort.sortKey} sortDir={panelsSort.sortDir} onSort={panelsSort.toggleSort} />
+                  <SortHeader label="Upstream" column="upstream" sortKey={panelsSort.sortKey} sortDir={panelsSort.sortDir} onSort={panelsSort.toggleSort} />
+                  <SortHeader label="Rating" column="rating" sortKey={panelsSort.sortKey} sortDir={panelsSort.sortDir} onSort={panelsSort.toggleSort} />
+                  <SortHeader label="Breakers" column="breakers" sortKey={panelsSort.sortKey} sortDir={panelsSort.sortDir} onSort={panelsSort.toggleSort} />
                 </tr>
               </thead>
               <tbody className={tableClasses.tbody}>
-                {snap.powerPanels.map((p) => (
+                {panelsSort.sorted.map((p) => (
                   <tr key={p.id} className={tableClasses.tr}>
                     <td className={`${tableClasses.td} font-semibold text-white`}>
                       {p.name}
@@ -297,15 +335,15 @@ export default function PowerCoolingPage() {
             <table className={tableClasses.table}>
               <thead className={tableClasses.thead}>
                 <tr>
-                  <th className={tableClasses.th}>Socket</th>
-                  <th className={tableClasses.th}>Panel</th>
-                  <th className={tableClasses.th}>Connector</th>
-                  <th className={tableClasses.th}>Rack</th>
-                  <th className={tableClasses.thRight}>Phase</th>
+                  <SortHeader label="Socket" column="socket" sortKey={socketsSort.sortKey} sortDir={socketsSort.sortDir} onSort={socketsSort.toggleSort} />
+                  <SortHeader label="Panel" column="panel" sortKey={socketsSort.sortKey} sortDir={socketsSort.sortDir} onSort={socketsSort.toggleSort} />
+                  <SortHeader label="Connector" column="connector" sortKey={socketsSort.sortKey} sortDir={socketsSort.sortDir} onSort={socketsSort.toggleSort} />
+                  <SortHeader label="Rack" column="rack" sortKey={socketsSort.sortKey} sortDir={socketsSort.sortDir} onSort={socketsSort.toggleSort} />
+                  <SortHeader label="Phase" column="phase" align="right" sortKey={socketsSort.sortKey} sortDir={socketsSort.sortDir} onSort={socketsSort.toggleSort} />
                 </tr>
               </thead>
               <tbody className={tableClasses.tbody}>
-                {snap.powerCircuits.map((c) => (
+                {socketsSort.sorted.map((c) => (
                   <tr key={c.id} className={tableClasses.tr}>
                     <td className={`${tableClasses.td} font-semibold text-white`}>
                       {c.floorSocketLabel}
@@ -368,15 +406,15 @@ export default function PowerCoolingPage() {
           <table className={tableClasses.table}>
             <thead className={tableClasses.thead}>
               <tr>
-                <th className={tableClasses.th}>Unit</th>
-                <th className={tableClasses.th}>Type</th>
-                <th className={tableClasses.th}>Capacity</th>
-                <th className={tableClasses.th}>Room</th>
-                <th className={tableClasses.thRight}>Status</th>
+                <SortHeader label="Unit" column="name" sortKey={coolingSort.sortKey} sortDir={coolingSort.sortDir} onSort={coolingSort.toggleSort} />
+                <SortHeader label="Type" column="unitType" sortKey={coolingSort.sortKey} sortDir={coolingSort.sortDir} onSort={coolingSort.toggleSort} />
+                <SortHeader label="Capacity" column="capacityKw" sortKey={coolingSort.sortKey} sortDir={coolingSort.sortDir} onSort={coolingSort.toggleSort} />
+                <SortHeader label="Room" column="roomName" sortKey={coolingSort.sortKey} sortDir={coolingSort.sortDir} onSort={coolingSort.toggleSort} />
+                <SortHeader label="Status" column="status" align="right" sortKey={coolingSort.sortKey} sortDir={coolingSort.sortDir} onSort={coolingSort.toggleSort} />
               </tr>
             </thead>
             <tbody className={tableClasses.tbody}>
-              {coolingUnits.map((cu) => (
+              {coolingSort.sorted.map((cu) => (
                 <tr key={cu.id} className={tableClasses.tr}>
                   <td className={`${tableClasses.td} font-semibold text-white`}>{cu.name}</td>
                   <td className={tableClasses.td}>{cu.unitType}</td>
