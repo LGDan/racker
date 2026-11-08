@@ -6,6 +6,7 @@ import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import { LocationCrumbs } from "@/components/location/LocationFrame";
 import { crumbsFor, findChain } from "@/components/location/model";
 import { deviceKind, suggestedCode } from "@/lib/suggested-code";
+import { applianceLabel, heatBtu } from "@/lib/appliance-catalog";
 import {
   Cable,
   CheckCircle2,
@@ -115,12 +116,14 @@ interface Rack {
 
 interface Template {
   id: string;
+  name?: string;
   manufacturer: string;
   model: string;
   deviceType: string;
   uHeight: number;
   defaultWatts: number;
   peakWatts: number;
+  btuPerHour?: number;
   weightKg: number;
   psuCount: number;
   psuPlugType: string;
@@ -319,7 +322,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
     if (!t || !rack) return;
     const startU = suggestStart(rack, t.uHeight);
     setDraft({
-      name: `${t.manufacturer} ${t.model}`.slice(0, 48),
+      name: applianceLabel(t).slice(0, 48),
       deviceType: t.deviceType,
       manufacturer: t.manufacturer,
       model: t.model,
@@ -343,6 +346,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
       rackId: rack.id,
       ...draft,
       hostname,
+      templateId: templateId || null,
     });
     if (ok) {
       setShowAdd(false);
@@ -421,6 +425,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
       }))
   );
 
+  const chosenTemplate = templates.find((item) => item.id === templateId);
   const rackChain = findChain(sites, "rack", rack.id);
   const rackCrumbs = rackChain
     ? [
@@ -550,7 +555,14 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-4 md:grid-cols-6"
         >
           <label className="text-xs text-slate-400 md:col-span-2">
-            Catalog template
+            <span className="flex items-center justify-between gap-2">
+              Catalog template
+              {role === "ADMIN" && (
+                <Link href="/catalog" className="text-cyan-400 hover:underline">
+                  Edit catalog
+                </Link>
+              )}
+            </span>
             <select
               className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
               value={templateId}
@@ -559,10 +571,17 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
               <option value="">Custom device</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.manufacturer} {t.model}
+                  {applianceLabel(t)}
                 </option>
               ))}
             </select>
+            {chosenTemplate && (
+              <span className="mt-1 block text-[11px] text-slate-500">
+                {chosenTemplate.uHeight}U · {chosenTemplate.defaultWatts} W ·{" "}
+                {heatBtu(chosenTemplate).toLocaleString()} BTU/h · {chosenTemplate.psuCount}×{" "}
+                {chosenTemplate.psuPlugType} · {chosenTemplate.portCount} {chosenTemplate.portType}
+              </span>
+            )}
           </label>
           <Field label="Name" className="md:col-span-2">
             <input

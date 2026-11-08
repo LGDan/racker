@@ -283,12 +283,14 @@ model PduOutlet {
 
 model DeviceTemplate {
   id           String       @id @default(cuid())
+  name         String       @default("")
   manufacturer String
   model        String
   deviceType   String // SERVER | SWITCH | ROUTER | FIREWALL | STORAGE | PATCH_PANEL | UPS_RACK
   uHeight      Int          @default(1)
   defaultWatts Float        @default(450)
   peakWatts    Float        @default(700)
+  btuPerHour   Float        @default(0)
   weightKg     Float        @default(18)
   psuCount     Int          @default(2)
   psuPlugType  String       @default("C14") // C14 | C20

@@ -9,6 +9,7 @@ import {
   ChevronDown,
   HardDrive,
   LayoutDashboard,
+  Library,
   LogOut,
   Menu,
   Network,
@@ -59,7 +60,7 @@ function ShellFrame({ user, firstRackId, children }: AppShellProps) {
   const { sites } = useInfrastructure();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const spatial = !pathname.startsWith("/admin");
+  const spatial = !pathname.startsWith("/admin") && !pathname.startsWith("/catalog");
   const roomQuery = searchParams.get("room") || "";
   const rackMatch = pathname.match(/^\/racks\/([^/]+)/);
   const openRack = rackMatch?.[1] || "";
@@ -110,6 +111,13 @@ function ShellFrame({ user, firstRackId, children }: AppShellProps) {
       href: rackTarget ? `/racks/${rackTarget}` : "/racks",
       icon: HardDrive,
       active: pathname.startsWith("/racks"),
+    },
+    {
+      label: "Catalog",
+      title: "Appliance Catalog",
+      href: "/catalog",
+      icon: Library,
+      active: pathname.startsWith("/catalog"),
     },
     {
       label: "Power",

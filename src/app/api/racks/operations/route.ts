@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         psuPlugType,
         portCount,
         portType,
+        templateId,
       } = body;
 
       const rack = await prisma.rack.findUnique({
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
       const dev = await prisma.rackDevice.create({
         data: {
           rackId,
+          templateId: templateId || null,
           name,
           hostname:
             hostname ||

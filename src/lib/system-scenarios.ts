@@ -71,12 +71,14 @@ async function ensureTemplates(db: Db): Promise<Templates> {
   for (const row of rows) {
     const item = await db.deviceTemplate.create({
       data: {
+        name: `${row[0]} ${row[1]}`,
         manufacturer: row[0],
         model: row[1],
         deviceType: row[2],
         uHeight: row[3],
         defaultWatts: row[4],
         peakWatts: row[5],
+        btuPerHour: Math.round(row[4] * 3.412),
         weightKg: row[6],
         psuCount: row[7],
         psuPlugType: row[8],

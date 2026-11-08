@@ -38,12 +38,14 @@ async function main() {
   // Device Templates Catalog
   const tplDellR760 = await prisma.deviceTemplate.create({
     data: {
+      name: "Dell PowerEdge R760",
       manufacturer: "Dell",
       model: "PowerEdge R760 (2U Compute)",
       deviceType: "SERVER",
       uHeight: 2,
       defaultWatts: 680,
       peakWatts: 1100,
+      btuPerHour: 2320,
       weightKg: 28,
       psuCount: 2,
       psuPlugType: "C14",
@@ -54,12 +56,14 @@ async function main() {
 
   const tplHpeDl360 = await prisma.deviceTemplate.create({
     data: {
+      name: "HPE ProLiant DL360",
       manufacturer: "HPE",
       model: "ProLiant DL360 Gen11 (1U Dense)",
       deviceType: "SERVER",
       uHeight: 1,
       defaultWatts: 460,
       peakWatts: 750,
+      btuPerHour: 1570,
       weightKg: 17,
       psuCount: 2,
       psuPlugType: "C14",
@@ -70,12 +74,14 @@ async function main() {
 
   const tplGpuNode = await prisma.deviceTemplate.create({
     data: {
+      name: "Supermicro 8-GPU node",
       manufacturer: "Supermicro",
       model: "SYS-421GE-TNRT (4U 8xGPU AI Node)",
       deviceType: "SERVER",
       uHeight: 4,
       defaultWatts: 3200,
       peakWatts: 4800,
+      btuPerHour: 10918,
       weightKg: 68,
       psuCount: 4,
       psuPlugType: "C20",
@@ -86,12 +92,14 @@ async function main() {
 
   const tplAristaSwitch = await prisma.deviceTemplate.create({
     data: {
+      name: "Arista 7050SX3 leaf",
       manufacturer: "Arista",
       model: "7050SX3-48YC8 (1U ToR Leaf Switch)",
       deviceType: "SWITCH",
       uHeight: 1,
       defaultWatts: 280,
       peakWatts: 420,
+      btuPerHour: 955,
       weightKg: 9.5,
       psuCount: 2,
       psuPlugType: "C14",
@@ -102,12 +110,14 @@ async function main() {
 
   const tplNetAppStorage = await prisma.deviceTemplate.create({
     data: {
+      name: "NetApp AFF A400",
       manufacturer: "NetApp",
       model: "AFF A400 (4U NVMe SAN)",
       deviceType: "STORAGE",
       uHeight: 4,
       defaultWatts: 1150,
       peakWatts: 1600,
+      btuPerHour: 3924,
       weightKg: 46,
       psuCount: 2,
       psuPlugType: "C20",
@@ -118,12 +128,14 @@ async function main() {
 
   const tplPatchPanel = await prisma.deviceTemplate.create({
     data: {
+      name: "Corning EDGE8 patch panel",
       manufacturer: "Corning",
       model: "EDGE8 24-Port OM4 Fiber Patch Panel",
       deviceType: "PATCH_PANEL",
       uHeight: 1,
       defaultWatts: 0,
       peakWatts: 0,
+      btuPerHour: 0,
       weightKg: 3.5,
       psuCount: 0,
       psuPlugType: "C14",
