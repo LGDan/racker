@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth-guards";
+import { requireStrictAdmin as requireAdmin } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import {
   CSV_ENTITIES,

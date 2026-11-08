@@ -105,6 +105,22 @@ html[data-theme="light"] .text-sky-300,
 html[data-theme="light"] .text-sky-400 { color: #0369a1; }
 html[data-theme="light"] .text-blue-300,
 html[data-theme="light"] .text-blue-400 { color: #1d4ed8; }
+html[data-theme="light"] .text-violet-100,
+html[data-theme="light"] .text-violet-200,
+html[data-theme="light"] .text-violet-300,
+html[data-theme="light"] .text-violet-400 { color: #5b21b6; }
+
+html[data-theme="light"] .bg-violet-500\/10 { background-color: #f5f3ff; }
+html[data-theme="light"] .bg-violet-500\/15 { background-color: #ede9fe; }
+html[data-theme="light"] .bg-violet-500\/20 { background-color: #ddd6fe; }
+html[data-theme="light"] .hover\:bg-violet-500\/25:hover,
+html[data-theme="light"] .hover\:bg-violet-500\/30:hover { background-color: #c4b5fd; }
+html[data-theme="light"] .border-violet-400\/40,
+html[data-theme="light"] .border-violet-400\/50,
+html[data-theme="light"] .border-violet-500\/30,
+html[data-theme="light"] .border-violet-500\/40,
+html[data-theme="light"] .border-violet-500\/50,
+html[data-theme="light"] .border-violet-500\/60 { border-color: #a78bfa; }
 
 html[data-theme="light"] .bg-rose-950,
 html[data-theme="light"] .bg-rose-950\/80,

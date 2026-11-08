@@ -4,16 +4,16 @@ overview: Add Ops Mode vs Plan Mode with per-plan isolated PostgreSQL schemas, a
 todos:
   - id: plan-schema-and-db-routing
     content: Add InfrastructurePlan model to prisma/schema.prisma and update src/lib/db.ts + src/lib/capacity-engine.ts to support dynamic per-plan Prisma schemas via the racker_active_plan cookie
-    status: pending
+    status: completed
   - id: plan-compare-apply-engine
     content: Build src/lib/plan-engine.ts with schema cloning (Ops -> Plan), comparePlanWithOps (capacity deltas, warnings diff, additions/modifications/removals), rebase, apply-to-Ops, and delete
-    status: pending
+    status: completed
   - id: plan-api-and-permissions
     content: Add /api/plans route and update src/lib/auth-guards.ts + /api/infrastructure so any authenticated user can create/activate plans and edit all infrastructure layers inside an active plan
-    status: pending
+    status: completed
   - id: plan-ui-switcher-and-page
     content: Update AppShell.tsx and infrastructure-context.tsx with the top-bar Ops/Plan Mode switcher, active Plan Mode banner, and Plans top-level nav tab, and build src/app/(dashboard)/plans/page.tsx with the Compare & Apply dashboard
-    status: pending
+    status: completed
 isProject: false
 ---
 

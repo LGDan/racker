@@ -422,10 +422,10 @@ export async function infrastructureCounts() {
   return { sites, rooms, racks, devices, users };
 }
 
-export async function exportSnapshot() {
+export async function exportSnapshot(db: Db | PrismaClient = prisma) {
   const tables: Record<string, unknown[]> = {};
   for (const key of SNAPSHOT_ORDER) {
-    tables[key] = await delegate(prisma, key).findMany();
+    tables[key] = await delegate(db, key).findMany();
   }
   return {
     format: "racker-snapshot",
@@ -470,9 +470,12 @@ export async function wipeInfrastructure(db: Db | PrismaClient = prisma) {
   await db.deviceTemplate.deleteMany();
 }
 
-export async function replaceWithSnapshot(snapshot: unknown) {
+export async function replaceWithSnapshot(
+  snapshot: unknown,
+  client: PrismaClient = prisma
+) {
   const parsed = parseSnapshot(snapshot);
-  await prisma.$transaction(
+  await client.$transaction(
     async (tx) => {
       await wipeInfrastructure(tx);
       await insertTables(tx, parsed.tables);

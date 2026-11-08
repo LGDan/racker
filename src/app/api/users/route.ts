@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { requireAdmin, requireAuth } from "@/lib/auth-guards";
+import { requireStrictAdmin as requireAdmin, requireAuth } from "@/lib/auth-guards";
 
 export async function GET() {
   const auth = await requireAuth();

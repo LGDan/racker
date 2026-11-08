@@ -188,17 +188,35 @@ interface SupplySummary {
   loadPct: number;
 }
 
+export interface PlanSummary {
+  id: string;
+  name: string;
+  description: string;
+  status: string;
+  schemaName: string;
+  createdByName: string;
+  createdAt?: string;
+  baseExportedAt: string;
+  appliedAt?: string | null;
+  updatedAt: string;
+}
+
 interface Snapshot {
   sites: TreeSite[];
   powerPanels?: TreePanel[];
   powerCircuits: FloorCircuit[];
   powerSources?: RawSupply[];
+  activePlan?: PlanSummary | null;
+  plans?: PlanSummary[];
   capacity?: {
     racks?: RackMetric[];
     panels?: PanelMetric[];
     powerSources?: SupplySummary[];
   };
-  currentUser?: { role?: "ADMIN" | "STANDARD" };
+  currentUser?: {
+    role?: "ADMIN" | "STANDARD";
+    accountRole?: "ADMIN" | "STANDARD";
+  };
 }
 
 export interface EditDraft {
@@ -226,6 +244,9 @@ export interface EditDraft {
 interface InfrastructureValue {
   loading: boolean;
   role: "ADMIN" | "STANDARD";
+  accountRole: "ADMIN" | "STANDARD";
+  activePlan: PlanSummary | null;
+  plans: PlanSummary[];
   sites: TreeSite[];
   panels: TreePanel[];
   circuits: FloorCircuit[];
@@ -642,6 +663,9 @@ export function InfrastructureProvider({
     () => ({
       loading,
       role: resolvedRole,
+      accountRole: snapshot?.currentUser?.accountRole || role,
+      activePlan: snapshot?.activePlan || null,
+      plans: snapshot?.plans || [],
       sites,
       panels: snapshot?.powerPanels || [],
       circuits: snapshot?.powerCircuits || [],
@@ -658,6 +682,10 @@ export function InfrastructureProvider({
     [
       loading,
       resolvedRole,
+      role,
+      snapshot?.currentUser?.accountRole,
+      snapshot?.activePlan,
+      snapshot?.plans,
       sites,
       snapshot?.powerPanels,
       snapshot?.powerCircuits,

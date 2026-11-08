@@ -1,4 +1,5 @@
-import { prisma } from "./db";
+import { type PrismaClient } from "@prisma/client";
+import { prisma as defaultPrisma } from "./db";
 
 export interface PhaseLoad {
   wattsL1: number;
@@ -164,7 +165,9 @@ function calcImbalance(w1: number, w2: number, w3: number): number {
   return Math.round((maxDev / avg) * 1000) / 10;
 }
 
-export async function getFullInfrastructureSnapshot() {
+export async function getFullInfrastructureSnapshot(
+  prisma: PrismaClient = defaultPrisma
+) {
   const [
     sites,
     rooms,

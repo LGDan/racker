@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin, requireAuth } from "@/lib/auth-guards";
+import { requireAdminOrPlan, requireAuth } from "@/lib/auth-guards";
 import { CatalogError, readAppliance, readPduTemplate } from "@/lib/appliance-catalog";
 import {
   appliancesFromCsv,
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireAdminOrPlan();
   if (auth.error) return auth.error;
 
   try {
