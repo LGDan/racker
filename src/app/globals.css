@@ -64,6 +64,10 @@ html[data-theme="light"] .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
 html[data-theme="light"] .divide-slate-800\/70 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
 
 html[data-theme="light"] .text-white { color: #0f172a; }
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea { color: #0f172a; }
+html[data-theme="light"] .bg-slate-950\/60 { background-color: rgb(248 250 252 / 0.6); }
 html[data-theme="light"] .text-white\/80 { color: rgb(15 23 42 / 0.75); }
 html[data-theme="light"] .hover\:text-white:hover { color: #0f172a; }
 html[data-theme="light"] .text-slate-100 { color: #0f172a; }

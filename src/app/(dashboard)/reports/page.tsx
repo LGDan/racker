@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { BarChart3 } from "lucide-react";
+import { PageHeader, SectionCard, btnPrimary, btnSecondary, tableClasses } from "@/components/ui/primitives";
 
 interface Capacity {
   totals: {
@@ -130,47 +132,48 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-8 p-6 lg:p-8">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Capacity and phase report</h1>
-          <p className="mt-1 text-xs text-slate-400">
-            {capacity.totals.usedU} of {capacity.totals.totalU} U occupied · {capacity.totals.totalItKw} kW IT ·{" "}
-            {capacity.totals.freePduOutlets} of {capacity.totals.totalPduOutlets} PDU sockets free ·{" "}
-            {capacity.totals.totalOnlineCoolingKw} kW cooling online · {capacity.totals.spofDevicesCount} single-corded devices
-          </p>
-        </div>
-        <button
-          onClick={() =>
-            download("racker-capacity.csv", [
-              ["Rack", "Site", "Room", "Used U", "Total U", "Largest free block", "Watts", "Max watts", "Feed A W", "Feed B W", "Free outlets", "SPOF devices"],
-              ...capacity.racks.map((r) => [
-                r.code,
-                r.siteCode,
-                r.roomName,
-                r.usedU,
-                r.totalU,
-                r.largestContiguousFreeU,
-                r.currentPowerWatts,
-                r.maxPowerWatts,
-                r.feedAWatts,
-                r.feedBWatts,
-                r.freeOutlets,
-                r.spofDeviceCount,
-              ]),
-            ])
-          }
-          className="rounded-lg bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950"
-        >
-          Export rack CSV
-        </button>
-      </div>
-
-      <section className="overflow-hidden rounded-xl border border-slate-800">
-        <header className="flex items-center justify-between bg-slate-900 px-4 py-3">
-          <h2 className="text-sm font-semibold text-white">Distribution panels</h2>
+    <div className="space-y-6 p-6 lg:p-8">
+      <PageHeader
+        kicker="Telemetry & Capacity Audit"
+        icon={<BarChart3 className="h-3.5 w-3.5" />}
+        title="Capacity and phase report"
+        subtitle={`${capacity.totals.usedU} of ${capacity.totals.totalU} U occupied · ${capacity.totals.totalItKw} kW IT · ${capacity.totals.freePduOutlets} of ${capacity.totals.totalPduOutlets} PDU sockets free · ${capacity.totals.totalOnlineCoolingKw} kW cooling online · ${capacity.totals.spofDevicesCount} single-corded devices`}
+        actions={
           <button
-            className="text-xs text-cyan-400"
+            type="button"
+            onClick={() =>
+              download("racker-capacity.csv", [
+                ["Rack", "Site", "Room", "Used U", "Total U", "Largest free block", "Watts", "Max watts", "Feed A W", "Feed B W", "Free outlets", "SPOF devices"],
+                ...capacity.racks.map((r) => [
+                  r.code,
+                  r.siteCode,
+                  r.roomName,
+                  r.usedU,
+                  r.totalU,
+                  r.largestContiguousFreeU,
+                  r.currentPowerWatts,
+                  r.maxPowerWatts,
+                  r.feedAWatts,
+                  r.feedBWatts,
+                  r.freeOutlets,
+                  r.spofDeviceCount,
+                ]),
+              ])
+            }
+            className={btnPrimary}
+          >
+            Export rack CSV
+          </button>
+        }
+      />
+
+      <SectionCard
+        title="Distribution panels"
+        subtitle="Three-phase current and balance across L1 / L2 / L3"
+        actions={
+          <button
+            type="button"
+            className={btnSecondary}
             onClick={() =>
               download("racker-phases.csv", [
                 ["Panel", "Feed", "L1 A", "L2 A", "L3 A", "L1 W", "L2 W", "L3 W", "Imbalance %", "Max phase %", "Breakers used"],
@@ -192,7 +195,8 @@ export default function ReportsPage() {
           >
             Export phases
           </button>
-        </header>
+        }
+      >
         <div className="divide-y divide-slate-800">
           {capacity.panels.map((p) => (
             <div key={p.id} className="grid gap-3 bg-slate-950/40 p-4 md:grid-cols-[1.2fr_2fr]">
@@ -224,103 +228,149 @@ export default function ReportsPage() {
             </div>
           ))}
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="overflow-x-auto rounded-xl border border-slate-800">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-900 text-[11px] uppercase tracking-wider text-slate-400">
-            <tr>
-              <th className="px-3 py-2">Rack</th>
-              <th className="px-3 py-2">U</th>
-              <th className="px-3 py-2">Power</th>
-              <th className="px-3 py-2">Sockets</th>
-              <th className="px-3 py-2">Redundancy</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {capacity.racks.map((r) => (
-              <tr key={r.id}>
-                <td className="px-3 py-2">
-                  <Link href={`/racks/${r.id}`} className="font-semibold text-cyan-300">
-                    {r.code}
-                  </Link>
-                  <div className="text-slate-500">{r.roomName}</div>
-                </td>
-                <td className="px-3 py-2 font-mono text-slate-200">
-                  {r.usedU}/{r.totalU} · gap {r.largestContiguousFreeU}U
-                </td>
-                <td className="px-3 py-2 font-mono">
-                  {r.currentPowerWatts} / {r.maxPowerWatts} W
-                  <div className="text-[10px] text-slate-500">
-                    A {r.feedAWatts} · B {r.feedBWatts}
-                  </div>
-                </td>
-                <td className="px-3 py-2 font-mono">{r.freeOutlets} free / {r.totalOutlets}</td>
-                <td className={`px-3 py-2 ${r.spofDeviceCount ? "text-amber-300" : "text-emerald-300"}`}>
-                  {r.spofDeviceCount ? `${r.spofDeviceCount} single-corded` : "A+B"}
-                </td>
+      <SectionCard
+        title="Rack capacity matrix"
+        subtitle="U space, contiguous free blocks, A/B power draw, and socket availability"
+      >
+        <div className={tableClasses.wrapper}>
+          <table className={tableClasses.table}>
+            <thead className={tableClasses.thead}>
+              <tr>
+                <th className={tableClasses.th}>Rack</th>
+                <th className={tableClasses.th}>U</th>
+                <th className={tableClasses.th}>Power</th>
+                <th className={tableClasses.th}>Sockets</th>
+                <th className={tableClasses.th}>Redundancy</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody className={tableClasses.tbody}>
+              {capacity.racks.map((r) => (
+                <tr key={r.id} className={tableClasses.tr}>
+                  <td className={tableClasses.td}>
+                    <Link href={`/racks/${r.id}`} className="font-semibold text-cyan-300 hover:underline">
+                      {r.code}
+                    </Link>
+                    <div className="text-slate-500">{r.roomName}</div>
+                  </td>
+                  <td className={`${tableClasses.td} font-mono text-slate-200`}>
+                    {r.usedU}/{r.totalU} · gap {r.largestContiguousFreeU}U
+                  </td>
+                  <td className={`${tableClasses.td} font-mono`}>
+                    {r.currentPowerWatts} / {r.maxPowerWatts} W
+                    <div className="text-[10px] text-slate-500">
+                      A {r.feedAWatts} · B {r.feedBWatts}
+                    </div>
+                  </td>
+                  <td className={`${tableClasses.td} font-mono`}>{r.freeOutlets} free / {r.totalOutlets}</td>
+                  <td className={`${tableClasses.td} ${r.spofDeviceCount ? "text-amber-300" : "text-emerald-300"}`}>
+                    {r.spofDeviceCount ? `${r.spofDeviceCount} single-corded` : "A+B"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-white">PDU sockets and amps</h2>
-          <div className="space-y-2 text-xs">
-            {capacity.pdus.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-2">
-                <div>
-                  <div className="text-slate-100">{p.name}</div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SectionCard
+          title="PDU sockets and amps"
+          subtitle="Rack PDU load and free C13 / C19 outlets"
+        >
+          <div className={tableClasses.wrapper}>
+            <table className={tableClasses.table}>
+              <thead className={tableClasses.thead}>
+                <tr>
+                  <th className={tableClasses.th}>PDU</th>
+                  <th className={tableClasses.th}>Rack / Feed</th>
+                  <th className={tableClasses.th}>Whip</th>
+                  <th className={tableClasses.th}>Load</th>
+                  <th className={tableClasses.thRight}>Free sockets</th>
+                </tr>
+              </thead>
+              <tbody className={tableClasses.tbody}>
+                {capacity.pdus.map((p) => (
+                  <tr key={p.id} className={tableClasses.tr}>
+                    <td className={`${tableClasses.td} font-semibold text-white`}>{p.name}</td>
+                    <td className={tableClasses.td}>
+                      {p.rackCode} · feed {p.feedSide}
+                    </td>
+                    <td className={tableClasses.td}>{p.floorSocketLabel || "no floor socket"}</td>
+                    <td className={`${tableClasses.td} font-mono`}>
+                      {p.loadAmps}/{p.maxAmps} A · {p.loadPct}%
+                    </td>
+                    <td className={`${tableClasses.tdRight} font-mono text-slate-400`}>
+                      C13 {p.c13Total - p.c13Used}/{p.c13Total} · C19 {p.c19Total - p.c19Used}/{p.c19Total}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        <div className="space-y-6">
+          <SectionCard
+            title="Room thermal margin"
+            subtitle="IT heat output vs online cooling capacity"
+            padded
+          >
+            <div className="space-y-3">
+              {capacity.roomsCooling.map((r) => (
+                <div key={r.roomName} className="text-xs">
+                  <div className="flex justify-between font-medium text-slate-200">
+                    <span>{r.roomName}</span>
+                    <span>{r.thermalUtilizationPct}%</span>
+                  </div>
                   <div className="text-slate-500">
-                    {p.rackCode} · feed {p.feedSide} · {p.floorSocketLabel || "no floor socket"}
+                    {r.itLoadKw} kW · {r.itHeatBtuHr.toLocaleString()} BTU/h · {r.onlineCoolingKw} kW online · {r.redundancyMode}{" "}
+                    {r.nPlusOneCompliant ? "holds" : "short"}
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-800">
+                    <div className="h-full bg-sky-400" style={{ width: `${Math.min(100, r.thermalUtilizationPct)}%` }} />
                   </div>
                 </div>
-                <div className="text-right font-mono text-slate-300">
-                  {p.loadAmps}/{p.maxAmps} A · {p.loadPct}%
-                  <div className="text-[10px] text-slate-500">
-                    C13 {p.c13Total - p.c13Used}/{p.c13Total} · C19 {p.c19Total - p.c19Used}/{p.c19Total}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Upstream supply headroom"
+            subtitle="Load and current across utility feeds, generators, ATS, and UPS"
+          >
+            <div className={tableClasses.wrapper}>
+              <table className={tableClasses.table}>
+                <thead className={tableClasses.thead}>
+                  <tr>
+                    <th className={tableClasses.th}>Supply</th>
+                    <th className={tableClasses.th}>Type / Bus</th>
+                    <th className={tableClasses.th}>Power</th>
+                    <th className={tableClasses.thRight}>Current</th>
+                  </tr>
+                </thead>
+                <tbody className={tableClasses.tbody}>
+                  {capacity.powerSources.map((s) => (
+                    <tr key={s.name} className={tableClasses.tr}>
+                      <td className={`${tableClasses.td} font-semibold text-white`}>{s.name}</td>
+                      <td className={tableClasses.td}>
+                        {s.sourceType} {s.redundancyGroup}
+                      </td>
+                      <td className={`${tableClasses.td} font-mono`}>
+                        {s.loadKw}/{s.capacityKw} kW
+                      </td>
+                      <td className={`${tableClasses.tdRight} font-mono text-slate-400`}>
+                        {s.loadAmps}/{s.maxAmps} A
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
         </div>
-        <div className="space-y-4">
-          <div className="rounded-xl border border-slate-800 p-4">
-            <h2 className="mb-3 text-sm font-semibold text-white">Room thermal margin</h2>
-            {capacity.roomsCooling.map((r) => (
-              <div key={r.roomName} className="mb-3 text-xs">
-                <div className="flex justify-between text-slate-200">
-                  <span>{r.roomName}</span>
-                  <span>{r.thermalUtilizationPct}%</span>
-                </div>
-                <div className="text-slate-500">
-                  {r.itLoadKw} kW · {r.itHeatBtuHr.toLocaleString()} BTU/h · {r.onlineCoolingKw} kW online · {r.redundancyMode}{" "}
-                  {r.nPlusOneCompliant ? "holds" : "short"}
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-800">
-                  <div className="h-full bg-sky-400" style={{ width: `${Math.min(100, r.thermalUtilizationPct)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="rounded-xl border border-slate-800 p-4 text-xs">
-            <h2 className="mb-3 text-sm font-semibold text-white">Upstream supply headroom</h2>
-            {capacity.powerSources.map((s) => (
-              <div key={s.name} className="mb-2 flex justify-between gap-3">
-                <span className="text-slate-300">
-                  {s.sourceType} {s.redundancyGroup} · {s.name}
-                </span>
-                <span className="font-mono text-slate-400">
-                  {s.loadKw}/{s.capacityKw} kW · {s.loadAmps}/{s.maxAmps} A
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

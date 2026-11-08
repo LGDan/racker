@@ -74,34 +74,33 @@ test.describe("infrastructure lifecycle", () => {
   test("creates a supply, panel, floor whips, and cooling unit", async ({ page }) => {
     await page.goto("/power-cooling");
 
-    const supply = page.locator("form").filter({ hasText: "Add a supply" });
-    await supply.locator("select").first().selectOption({ label: siteCode });
+    await page.getByRole("button", { name: "Add supply" }).click();
+    const supply = page.locator("form").filter({ hasText: "Add supply" });
+    await supply.getByLabel("Site").selectOption({ label: siteCode });
     await supply.getByPlaceholder("Name").fill(sourceName);
     await supply.getByRole("button", { name: "Add supply" }).click();
     await expect(page.getByRole("heading", { name: sourceName })).toBeVisible();
 
+    await page.getByRole("button", { name: "Add panel" }).click();
     const panel = page.locator("form").filter({ has: page.getByPlaceholder("Panel name") });
     await panel.getByPlaceholder("Panel name").fill(panelName);
-    await panel.locator("select").nth(0).selectOption({ label: roomName });
-    await panel.locator("select").nth(1).selectOption({ label: sourceName });
+    await panel.getByLabel("Room").selectOption({ label: roomName });
+    await panel.getByLabel("Upstream supply").selectOption({ label: sourceName });
     await panel.getByRole("button", { name: "Add panel" }).click();
     await expect(page.getByText(panelName).first()).toBeVisible();
 
     await addWhip(page, whipA, "L1");
     await addWhip(page, whipB, "L2");
 
-    const whipRow = page
-      .locator("div.flex")
-      .filter({ hasText: whipB })
-      .filter({ has: page.locator("select") })
-      .last();
+    const whipRow = page.getByRole("row").filter({ hasText: whipB }).last();
     await whipRow.locator("select").selectOption("L3");
     await expect(whipRow.locator("select")).toHaveValue("L3");
 
+    await page.getByRole("button", { name: "Add cooling unit" }).click();
     const cooling = page.locator("form").filter({ has: page.getByPlaceholder("Unit name") });
     await cooling.getByPlaceholder("Unit name").fill(coolingName);
-    await cooling.locator("select").first().selectOption({ label: roomName });
-    await cooling.locator("select").nth(1).selectOption("CRAH");
+    await cooling.getByLabel("Room").selectOption({ label: roomName });
+    await cooling.getByLabel("Unit type").selectOption("CRAH");
     await cooling.getByRole("button", { name: "Add unit" }).click();
     await expect(page.getByText(coolingName).first()).toBeVisible();
   });
@@ -165,13 +164,14 @@ async function cordPsu(page: Page, psuName: string, pduName: string, outletNo: n
 }
 
 async function addWhip(page: Page, label: string, phase: string) {
+  await page.getByRole("button", { name: "Add socket" }).click();
   const form = page.locator("form").filter({ has: page.getByPlaceholder("Whip name") });
   await form.getByPlaceholder("Whip name").fill(label);
   await form.getByPlaceholder("Floor socket label").fill(label);
-  await form.locator("select").nth(0).selectOption({ label: panelName });
-  await form.locator("select").nth(1).selectOption({ label: roomName });
-  await form.locator("select").nth(2).selectOption({ label: rackCode });
-  await form.locator("select").nth(3).selectOption(phase);
+  await form.getByLabel("Distribution panel").selectOption({ label: panelName });
+  await form.getByLabel("Room").selectOption({ label: roomName });
+  await form.getByLabel("Target rack").selectOption({ label: rackCode });
+  await form.getByLabel("Phase").selectOption(phase);
   await form.getByRole("button", { name: "Add socket" }).click();
   await expect(page.getByText(label).first()).toBeVisible();
 }

@@ -193,11 +193,14 @@ export function LayeredVisualizer() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-0px)] min-h-[720px] flex-col">
+    <div className="flex h-[calc(100vh-3.5rem)] min-h-[720px] flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-6 py-4">
         <div>
-          <h1 className="text-xl font-bold text-white">Layered diagrams</h1>
-          <p className="text-xs text-slate-400">
+          <div className="text-xs font-semibold uppercase tracking-widest text-cyan-400">
+            Single-Line & Topology Views
+          </div>
+          <h1 className="mt-1 text-2xl font-bold text-white">Layered diagrams</h1>
+          <p className="mt-0.5 text-xs text-slate-400">
             Electrical single-line, network patching, cooling, and the spatial tree. Toggle a supply offline to see the blast radius.
           </p>
         </div>

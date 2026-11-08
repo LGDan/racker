@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
+import { SectionCard, tableClasses } from "@/components/ui/primitives";
 import { LocationFrame, Meter } from "./LocationFrame";
 import { LocationMediaGallery } from "./LocationMedia";
 import {
@@ -121,34 +122,36 @@ export function SiteView({ siteId }: { siteId: string }) {
         {supplies.length === 0 ? (
           <p className="text-sm text-slate-400">This site has no power sources yet.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full min-w-[640px] text-left text-xs">
-              <thead className="bg-slate-900 text-[10px] uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 font-semibold">Name</th>
-                  <th className="px-3 py-2 font-semibold">Type</th>
-                  <th className="px-3 py-2 font-semibold">Group</th>
-                  <th className="px-3 py-2 font-semibold">Status</th>
-                  <th className="px-3 py-2 font-semibold">Capacity</th>
-                  <th className="px-3 py-2 font-semibold">Load</th>
-                </tr>
-              </thead>
-              <tbody>
-                {supplies.map((source) => (
-                  <tr key={source.id} className="border-t border-slate-800 text-slate-200">
-                    <td className="px-3 py-2 font-medium text-white">{source.name}</td>
-                    <td className="px-3 py-2">{supplyTypeLabel(source.sourceType)}</td>
-                    <td className="px-3 py-2">{source.redundancyGroup}</td>
-                    <td className="px-3 py-2">{source.status}</td>
-                    <td className="px-3 py-2">{source.capacityKw} kW</td>
-                    <td className="px-3 py-2">
-                      {source.loadKw} kW ({source.loadPct}%)
-                    </td>
+          <SectionCard>
+            <div className={tableClasses.wrapper}>
+              <table className={tableClasses.table}>
+                <thead className={tableClasses.thead}>
+                  <tr>
+                    <th className={tableClasses.th}>Name</th>
+                    <th className={tableClasses.th}>Type</th>
+                    <th className={tableClasses.th}>Group</th>
+                    <th className={tableClasses.th}>Status</th>
+                    <th className={tableClasses.th}>Capacity</th>
+                    <th className={tableClasses.th}>Load</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className={tableClasses.tbody}>
+                  {supplies.map((source) => (
+                    <tr key={source.id} className={tableClasses.tr}>
+                      <td className={`${tableClasses.td} font-medium text-white`}>{source.name}</td>
+                      <td className={tableClasses.td}>{supplyTypeLabel(source.sourceType)}</td>
+                      <td className={tableClasses.td}>{source.redundancyGroup}</td>
+                      <td className={tableClasses.td}>{source.status}</td>
+                      <td className={tableClasses.td}>{source.capacityKw} kW</td>
+                      <td className={tableClasses.td}>
+                        {source.loadKw} kW ({source.loadPct}%)
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
         )}
       </section>
     </LocationFrame>

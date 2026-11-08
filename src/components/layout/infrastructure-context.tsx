@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { placedCode, suggestedCode } from "@/lib/suggested-code";
+import { AlertBanner, Modal, ModalFooter, inputClass } from "@/components/ui/primitives";
 
 export type AddEntity = "SITE" | "BUILDING" | "FLOOR" | "ROOM" | "ROW" | "RACK";
 
@@ -655,144 +656,113 @@ function HierarchyCreateDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-xl bg-slate-900 border border-slate-700 p-6 space-y-4 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 className="text-base font-bold text-white">
-            Add New {type} to Infrastructure
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-xs text-slate-400 hover:text-white"
-          >
-            Close
-          </button>
+    <Modal title={`Add New ${type} to Infrastructure`} onClose={onClose}>
+      <AlertBanner error={errorMsg} />
+      <form onSubmit={handleCreateEntity} className="space-y-3 text-xs">
+        <div>
+          <label htmlFor="hierarchy-name" className="block text-slate-300 mb-1 font-medium">
+            Name / Description
+          </label>
+          <input
+            id="hierarchy-name"
+            type="text"
+            required
+            value={formName}
+            onChange={(event) => setFormName(event.target.value)}
+            placeholder={`e.g. ${
+              type === "RACK"
+                ? "Rack A04 (Compute)"
+                : type === "ROOM"
+                ? "Data Hall 1B"
+                : "New Item"
+            }`}
+            className={inputClass}
+          />
         </div>
 
-        {errorMsg && (
-          <div className="p-3 rounded bg-rose-500/15 border border-rose-500/30 text-xs text-rose-200">
-            {errorMsg}
+        <div>
+          <label htmlFor="hierarchy-code" className="block text-slate-300 mb-1 font-medium">
+            Short Code
+          </label>
+          <input
+            id="hierarchy-code"
+            type="text"
+            required
+            value={shortCode}
+            onChange={(event) => {
+              setCodeTouched(true);
+              setFormCode(event.target.value);
+            }}
+            placeholder={type === "SITE" ? "npl-ted" : "npl-ted.f12"}
+            className={`${inputClass} font-mono`}
+          />
+          <p className="mt-1 text-[11px] text-slate-500">
+            {type === "SITE"
+              ? "Suggested from the name. You can change it."
+              : "Suggested from the parent. You can change it."}
+          </p>
+        </div>
+
+        {type === "RACK" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 mb-1 font-medium">Height (Total U)</label>
+              <input
+                type="number"
+                value={formNumber1}
+                onChange={(event) => setFormNumber1(event.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 mb-1 font-medium">Max Power (Watts)</label>
+              <input
+                type="number"
+                value={formNumber2}
+                onChange={(event) => setFormNumber2(event.target.value)}
+                className={inputClass}
+              />
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleCreateEntity} className="space-y-3 text-xs">
-          <div>
-            <label htmlFor="hierarchy-name" className="block text-slate-300 mb-1 font-medium">
-              Name / Description
-            </label>
-            <input
-              id="hierarchy-name"
-              type="text"
-              required
-              value={formName}
-              onChange={(event) => setFormName(event.target.value)}
-              placeholder={`e.g. ${
-                type === "RACK"
-                  ? "Rack A04 (Compute)"
-                  : type === "ROOM"
-                  ? "Data Hall 1B"
-                  : "New Item"
-              }`}
-              className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="hierarchy-code" className="block text-slate-300 mb-1 font-medium">
-              Short Code
-            </label>
-            <input
-              id="hierarchy-code"
-              type="text"
-              required
-              value={shortCode}
-              onChange={(event) => {
-                setCodeTouched(true);
-                setFormCode(event.target.value);
-              }}
-              placeholder={type === "SITE" ? "npl-ted" : "npl-ted.f12"}
-              className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white font-mono"
-            />
-            <p className="mt-1 text-[11px] text-slate-500">
-              {type === "SITE"
-                ? "Suggested from the name. You can change it."
-                : "Suggested from the parent. You can change it."}
-            </p>
-          </div>
-
-          {type === "RACK" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Height (Total U)</label>
-                <input
-                  type="number"
-                  value={formNumber1}
-                  onChange={(event) => setFormNumber1(event.target.value)}
-                  className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Max Power (Watts)</label>
-                <input
-                  type="number"
-                  value={formNumber2}
-                  onChange={(event) => setFormNumber2(event.target.value)}
-                  className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white"
-                />
-              </div>
+        {type === "ROOM" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 mb-1 font-medium">
+                Cooling Capacity (kW)
+              </label>
+              <input
+                type="number"
+                value={formNumber1}
+                onChange={(event) => setFormNumber1(event.target.value)}
+                className={inputClass}
+              />
             </div>
-          )}
-
-          {type === "ROOM" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">
-                  Cooling Capacity (kW)
-                </label>
-                <input
-                  type="number"
-                  value={formNumber1}
-                  onChange={(event) => setFormNumber1(event.target.value)}
-                  className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium">Target Temp (°C)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={formNumber2}
-                  onChange={(event) => setFormNumber2(event.target.value)}
-                  className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white"
-                />
-              </div>
+            <div>
+              <label className="block text-slate-300 mb-1 font-medium">Target Temp (°C)</label>
+              <input
+                type="number"
+                step="0.5"
+                value={formNumber2}
+                onChange={(event) => setFormNumber2(event.target.value)}
+                className={inputClass}
+              />
             </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 rounded bg-slate-800 text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 rounded bg-cyan-500 text-slate-950 font-semibold disabled:opacity-60"
-            >
-              Create {type}
-            </button>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        <ModalFooter
+          onCancel={onClose}
+          submitLabel={`Create ${type}`}
+          saving={saving}
+        />
+      </form>
+    </Modal>
   );
 }
 
-const fieldClass = "w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white";
+const fieldClass = inputClass;
 
 function HierarchyEditDialog({
   draft,
@@ -868,156 +838,133 @@ function HierarchyEditDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-xl bg-slate-900 border border-slate-700 p-6 space-y-4 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 className="text-base font-bold text-white">Edit {form.type}</h3>
-          <button type="button" onClick={onClose} className="text-xs text-slate-400 hover:text-white">
-            Close
-          </button>
-        </div>
-        {errorMsg && (
-          <div className="p-3 rounded bg-rose-500/15 border border-rose-500/30 text-xs text-rose-200">
-            {errorMsg}
-          </div>
-        )}
-        <form onSubmit={handleSave} className="space-y-3 text-xs">
-          <Field label="Name" value={form.name} onChange={(value) => setField("name", value)} />
-          <Field label="Short Code" value={form.code} onChange={(value) => setField("code", value)} mono />
-          {form.type === "SITE" && (
-            <>
-              <Field label="Address" value={form.address} onChange={(value) => setField("address", value)} />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="City" value={form.city} onChange={(value) => setField("city", value)} />
-                <Field label="Country" value={form.country} onChange={(value) => setField("country", value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label="Utility capacity (kW)"
-                  value={form.utilityCapacityKw}
-                  onChange={(value) => setField("utilityCapacityKw", value)}
-                  number
-                />
-                <Field
-                  label="PUE target"
-                  value={form.pueTarget}
-                  onChange={(value) => setField("pueTarget", value)}
-                  number
-                  step="0.01"
-                />
-              </div>
-            </>
-          )}
-          {form.type === "FLOOR" && (
-            <Field
-              label="Level number"
-              value={form.levelNumber}
-              onChange={(value) => setField("levelNumber", value)}
-              number
-            />
-          )}
-          {form.type === "ROOM" && (
-            <>
-              <SelectField
-                label="Room type"
-                value={form.roomType}
-                onChange={(value) => setField("roomType", value)}
-                options={[
-                  ["DATA_HALL", "Data hall"],
-                  ["POWER_ROOM", "Power room"],
-                  ["COOLING_PLANT", "Cooling plant"],
-                  ["MEET_ME", "Meet-me"],
-                ]}
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label="Cooling capacity (kW)"
-                  value={form.coolingCapacityKw}
-                  onChange={(value) => setField("coolingCapacityKw", value)}
-                  number
-                />
-                <Field
-                  label="Target temp (°C)"
-                  value={form.ambientTempTargetC}
-                  onChange={(value) => setField("ambientTempTargetC", value)}
-                  number
-                  step="0.5"
-                />
-              </div>
-              <SelectField
-                label="Redundancy"
-                value={form.coolingRedundancy}
-                onChange={(value) => setField("coolingRedundancy", value)}
-                options={[
-                  ["N", "N"],
-                  ["N_PLUS_1", "N+1"],
-                  ["TWO_N", "2N"],
-                ]}
-              />
-            </>
-          )}
-          {form.type === "ROW" && (
-            <>
-              <SelectField
-                label="Orientation"
-                value={form.orientation}
-                onChange={(value) => setField("orientation", value)}
-                options={[
-                  ["HORIZONTAL", "Horizontal"],
-                  ["VERTICAL", "Vertical"],
-                ]}
-              />
-              <SelectField
-                label="Aisle containment"
-                value={form.aisleContainment}
-                onChange={(value) => setField("aisleContainment", value)}
-                options={[
-                  ["NONE", "None"],
-                  ["COLD_AISLE", "Cold aisle"],
-                  ["HOT_AISLE", "Hot aisle"],
-                ]}
-              />
-            </>
-          )}
-          {form.type === "RACK" && (
-            <>
+    <Modal title={`Edit ${form.type}`} onClose={onClose}>
+      <AlertBanner error={errorMsg} />
+      <form onSubmit={handleSave} className="space-y-3 text-xs">
+        <Field label="Name" value={form.name} onChange={(value) => setField("name", value)} />
+        <Field label="Short Code" value={form.code} onChange={(value) => setField("code", value)} mono />
+        {form.type === "SITE" && (
+          <>
+            <Field label="Address" value={form.address} onChange={(value) => setField("address", value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="City" value={form.city} onChange={(value) => setField("city", value)} />
+              <Field label="Country" value={form.country} onChange={(value) => setField("country", value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <Field
-                label="Height (total U)"
-                value={form.totalU}
-                onChange={(value) => setField("totalU", value)}
+                label="Utility capacity (kW)"
+                value={form.utilityCapacityKw}
+                onChange={(value) => setField("utilityCapacityKw", value)}
                 number
               />
-              <div className="grid grid-cols-2 gap-3">
-                <Field
-                  label="Max power (watts)"
-                  value={form.maxPowerWatts}
-                  onChange={(value) => setField("maxPowerWatts", value)}
-                  number
-                />
-                <Field
-                  label="Max weight (kg)"
-                  value={form.maxWeightKg}
-                  onChange={(value) => setField("maxWeightKg", value)}
-                  number
-                />
-              </div>
-            </>
-          )}
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
-            <button type="button" onClick={onClose} className="px-3 py-2 rounded bg-slate-800 text-slate-300">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 rounded bg-cyan-500 text-slate-950 font-semibold disabled:opacity-60"
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+              <Field
+                label="PUE target"
+                value={form.pueTarget}
+                onChange={(value) => setField("pueTarget", value)}
+                number
+                step="0.01"
+              />
+            </div>
+          </>
+        )}
+        {form.type === "FLOOR" && (
+          <Field
+            label="Level number"
+            value={form.levelNumber}
+            onChange={(value) => setField("levelNumber", value)}
+            number
+          />
+        )}
+        {form.type === "ROOM" && (
+          <>
+            <SelectField
+              label="Room type"
+              value={form.roomType}
+              onChange={(value) => setField("roomType", value)}
+              options={[
+                ["DATA_HALL", "Data hall"],
+                ["POWER_ROOM", "Power room"],
+                ["COOLING_PLANT", "Cooling plant"],
+                ["MEET_ME", "Meet-me"],
+              ]}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Cooling capacity (kW)"
+                value={form.coolingCapacityKw}
+                onChange={(value) => setField("coolingCapacityKw", value)}
+                number
+              />
+              <Field
+                label="Target temp (°C)"
+                value={form.ambientTempTargetC}
+                onChange={(value) => setField("ambientTempTargetC", value)}
+                number
+                step="0.5"
+              />
+            </div>
+            <SelectField
+              label="Redundancy"
+              value={form.coolingRedundancy}
+              onChange={(value) => setField("coolingRedundancy", value)}
+              options={[
+                ["N", "N"],
+                ["N_PLUS_1", "N+1"],
+                ["TWO_N", "2N"],
+              ]}
+            />
+          </>
+        )}
+        {form.type === "ROW" && (
+          <>
+            <SelectField
+              label="Orientation"
+              value={form.orientation}
+              onChange={(value) => setField("orientation", value)}
+              options={[
+                ["HORIZONTAL", "Horizontal"],
+                ["VERTICAL", "Vertical"],
+              ]}
+            />
+            <SelectField
+              label="Aisle containment"
+              value={form.aisleContainment}
+              onChange={(value) => setField("aisleContainment", value)}
+              options={[
+                ["NONE", "None"],
+                ["COLD_AISLE", "Cold aisle"],
+                ["HOT_AISLE", "Hot aisle"],
+              ]}
+            />
+          </>
+        )}
+        {form.type === "RACK" && (
+          <>
+            <Field
+              label="Height (total U)"
+              value={form.totalU}
+              onChange={(value) => setField("totalU", value)}
+              number
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Max power (watts)"
+                value={form.maxPowerWatts}
+                onChange={(value) => setField("maxPowerWatts", value)}
+                number
+              />
+              <Field
+                label="Max weight (kg)"
+                value={form.maxWeightKg}
+                onChange={(value) => setField("maxWeightKg", value)}
+                number
+              />
+            </div>
+          </>
+        )}
+        <ModalFooter onCancel={onClose} submitLabel="Save" saving={saving} />
+      </form>
+    </Modal>
   );
 }
 

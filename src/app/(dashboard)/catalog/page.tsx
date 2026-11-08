@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { Library, Plus } from "lucide-react";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import {
   APPLIANCE_TYPES,
@@ -11,6 +12,18 @@ import {
   btuFromWatts,
   heatBtu,
 } from "@/lib/appliance-catalog";
+import {
+  AlertBanner,
+  Field,
+  Modal,
+  ModalFooter,
+  PageHeader,
+  SectionCard,
+  btnPrimary,
+  btnSecondary,
+  inputClass,
+  tableClasses,
+} from "@/components/ui/primitives";
 
 interface Appliance {
   id: string;
@@ -68,6 +81,7 @@ export default function CatalogPage() {
   const [appliances, setAppliances] = useState<Appliance[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [btuTouched, setBtuTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -101,6 +115,14 @@ export default function CatalogPage() {
     });
   }
 
+  function beginCreate() {
+    setEditingId(null);
+    setBtuTouched(false);
+    setDraft(EMPTY);
+    setError(null);
+    setModalOpen(true);
+  }
+
   function beginEdit(item: Appliance) {
     const storedHeat = item.btuPerHour > 0;
     setEditingId(item.id);
@@ -121,9 +143,11 @@ export default function CatalogPage() {
       portType: item.portType,
     });
     setError(null);
+    setModalOpen(true);
   }
 
-  function resetForm() {
+  function closeModal() {
+    setModalOpen(false);
     setEditingId(null);
     setBtuTouched(false);
     setDraft(EMPTY);
@@ -133,6 +157,7 @@ export default function CatalogPage() {
     event.preventDefault();
     setSaving(true);
     setError(null);
+    setNotice(null);
     const res = await fetch("/api/catalog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,7 +173,7 @@ export default function CatalogPage() {
       setError(data.error || "Could not save the appliance");
       return;
     }
-    resetForm();
+    closeModal();
     await load();
   }
 
@@ -162,6 +187,7 @@ export default function CatalogPage() {
           : ` ${item.installedCount} installed devices keep their current settings.`;
     if (!window.confirm(`Remove ${label} from the catalog?${installed}`)) return;
     setError(null);
+    setNotice(null);
     const res = await fetch("/api/catalog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -172,7 +198,7 @@ export default function CatalogPage() {
       setError(data.error || "Could not remove the appliance");
       return;
     }
-    if (editingId === item.id) resetForm();
+    if (editingId === item.id) closeModal();
     await load();
   }
 
@@ -200,310 +226,288 @@ export default function CatalogPage() {
 
   return (
     <div className="space-y-6 p-6 lg:p-8">
-      <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Appliance catalog</h1>
-          <p className="mt-1 max-w-3xl text-xs text-slate-400">
+      <PageHeader
+        kicker="Appliance Library & Specs"
+        icon={<Library className="h-3.5 w-3.5" />}
+        title="Appliance catalog"
+        subtitle={
+          <>
             Predefined gear for the rack install list. Choosing one fills in the name, type, height,
             power, PSUs, plug, and ports.{" "}
             <Link href="/racks" className="text-cyan-400 hover:underline">
               Open a rack
             </Link>{" "}
             and use Install device to apply one.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <a
-            href="/api/catalog?format=csv"
-            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200"
-          >
-            Export CSV
-          </a>
-          {admin && (
-            <label className="cursor-pointer rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200">
-              Import CSV
-              <input
-                type="file"
-                accept="text/csv,.csv"
-                className="hidden"
-                disabled={saving}
-                onChange={(event) => {
-                  void importCsv(event.target.files?.[0]);
-                  event.target.value = "";
-                }}
-              />
-            </label>
-          )}
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <a href="/api/catalog?format=csv" className={btnSecondary}>
+              Export CSV
+            </a>
+            {admin && (
+              <>
+                <label className={`cursor-pointer ${btnSecondary}`}>
+                  Import CSV
+                  <input
+                    type="file"
+                    accept="text/csv,.csv"
+                    className="hidden"
+                    disabled={saving}
+                    onChange={(event) => {
+                      void importCsv(event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                <button type="button" onClick={beginCreate} className={btnPrimary}>
+                  <Plus className="h-3.5 w-3.5" />
+                  New appliance
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
+
       {admin && (
         <p className="-mt-3 text-[11px] text-slate-500">
           A blank id adds an appliance. An existing id updates that row. Leave BTU/h blank to fill it from watts.
         </p>
       )}
 
-      {error && (
-        <div className="rounded border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-xs text-rose-200">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="rounded border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-xs text-emerald-200">
-          {notice}
-        </div>
-      )}
-
-      {admin && (
-        <form
-          onSubmit={save}
-          className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-4 md:grid-cols-4"
-        >
-          <h2 className="text-sm font-semibold text-white md:col-span-4">
-            {editingId ? "Edit appliance" : "New appliance"}
-          </h2>
-          <Field label="Name">
-            <input
-              required
-              value={draft.name}
-              onChange={(event) => setField("name", event.target.value)}
-              placeholder="1U compute server"
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Manufacturer">
-            <input
-              required
-              value={draft.manufacturer}
-              onChange={(event) => setField("manufacturer", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Model">
-            <input
-              required
-              value={draft.model}
-              onChange={(event) => setField("model", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Type">
-            <select
-              value={draft.deviceType}
-              onChange={(event) => setField("deviceType", event.target.value)}
-              className={inputClass}
-            >
-              {APPLIANCE_TYPES.map((type) => (
-                <option key={type}>{type}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Height (U)">
-            <input
-              required
-              type="number"
-              min={1}
-              max={58}
-              value={draft.uHeight}
-              onChange={(event) => setField("uHeight", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Watts">
-            <input
-              required
-              type="number"
-              min={0}
-              value={draft.defaultWatts}
-              onChange={(event) => setField("defaultWatts", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Peak watts">
-            <input
-              required
-              type="number"
-              min={0}
-              value={draft.peakWatts}
-              onChange={(event) => setField("peakWatts", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="BTU/h">
-            <input
-              required
-              type="number"
-              min={0}
-              value={draft.btuPerHour}
-              onChange={(event) => {
-                setBtuTouched(true);
-                setField("btuPerHour", event.target.value);
-              }}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Weight (kg)">
-            <input
-              required
-              type="number"
-              min={0}
-              step="0.1"
-              value={draft.weightKg}
-              onChange={(event) => setField("weightKg", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="PSUs">
-            <input
-              required
-              type="number"
-              min={0}
-              max={8}
-              value={draft.psuCount}
-              onChange={(event) => setField("psuCount", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Plug">
-            <select
-              value={draft.psuPlugType}
-              onChange={(event) => setField("psuPlugType", event.target.value)}
-              className={inputClass}
-            >
-              {PLUG_TYPES.map((plug) => (
-                <option key={plug}>{plug}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Ports">
-            <input
-              required
-              type="number"
-              min={0}
-              max={256}
-              value={draft.portCount}
-              onChange={(event) => setField("portCount", event.target.value)}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Port type">
-            <select
-              value={draft.portType}
-              onChange={(event) => setField("portType", event.target.value)}
-              className={inputClass}
-            >
-              {PORT_TYPES.map((port) => (
-                <option key={port}>{port}</option>
-              ))}
-            </select>
-          </Field>
-          <div className="flex items-end gap-2 md:col-span-3">
-            <button
-              disabled={saving}
-              className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 disabled:opacity-60"
-            >
-              {saving ? "Saving…" : editingId ? "Save appliance" : "Add appliance"}
-            </button>
-            {editingId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300"
-              >
-                Cancel
-              </button>
-            )}
-            <span className="pb-2 text-[11px] text-slate-500">
-              BTU/h follows watts until you edit it. 1 W is about 3.412 BTU/h.
-            </span>
-          </div>
-        </form>
-      )}
+      {!modalOpen && <AlertBanner error={error} notice={notice} />}
 
       {appliances.length === 0 ? (
-        <p className="text-sm text-slate-400">The catalog is empty.</p>
+        <SectionCard padded>
+          <p className="text-sm text-slate-400">The catalog is empty.</p>
+        </SectionCard>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-800">
-          <table className="min-w-full text-left text-xs">
-            <thead className="bg-slate-900 text-slate-400">
-              <tr>
-                {[
-                  "Name",
-                  "Type",
-                  "Height",
-                  "Watts",
-                  "BTU/h",
-                  "PSUs",
-                  "Plug",
-                  "Ports",
-                  "Installed",
-                  "",
-                ].map((heading) => (
-                  <th key={heading} className="px-3 py-2 font-medium">
-                    {heading}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {appliances.map((item) => (
-                <tr key={item.id} className="bg-slate-950/40">
-                  <td className="px-3 py-2">
-                    <div className="font-semibold text-white">{applianceLabel(item)}</div>
-                    <div className="text-slate-500">
-                      {item.manufacturer} {item.model}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-slate-300">{item.deviceType}</td>
-                  <td className="px-3 py-2 text-slate-300">{item.uHeight}U</td>
-                  <td className="px-3 py-2 text-slate-300">
-                    {item.defaultWatts}
-                    <span className="text-slate-500"> / {item.peakWatts} peak</span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-300">{heatBtu(item).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-slate-300">{item.psuCount}</td>
-                  <td className="px-3 py-2 text-slate-300">{item.psuPlugType}</td>
-                  <td className="px-3 py-2 text-slate-300">
-                    {item.portCount}
-                    <span className="text-slate-500"> {item.portType}</span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-300">{item.installedCount}</td>
-                  <td className="px-3 py-2 text-right">
-                    {admin && (
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => beginEdit(item)}
-                          className="text-cyan-400 hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => remove(item)}
-                          className="text-rose-300 hover:underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
-                  </td>
+        <SectionCard
+          title="Catalog templates"
+          subtitle={`${appliances.length} ${appliances.length === 1 ? "appliance" : "appliances"} configured`}
+        >
+          <div className={tableClasses.wrapper}>
+            <table className={tableClasses.table}>
+              <thead className={tableClasses.thead}>
+                <tr>
+                  <th className={tableClasses.th}>Name</th>
+                  <th className={tableClasses.th}>Type</th>
+                  <th className={tableClasses.th}>Height</th>
+                  <th className={tableClasses.th}>Watts</th>
+                  <th className={tableClasses.th}>BTU/h</th>
+                  <th className={tableClasses.th}>PSUs</th>
+                  <th className={tableClasses.th}>Plug</th>
+                  <th className={tableClasses.th}>Ports</th>
+                  <th className={tableClasses.th}>Installed</th>
+                  <th className={tableClasses.thRight}> </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className={tableClasses.tbody}>
+                {appliances.map((item) => (
+                  <tr key={item.id} className={tableClasses.tr}>
+                    <td className={tableClasses.td}>
+                      <div className="font-semibold text-white">{applianceLabel(item)}</div>
+                      <div className="text-slate-500">
+                        {item.manufacturer} {item.model}
+                      </div>
+                    </td>
+                    <td className={tableClasses.td}>{item.deviceType}</td>
+                    <td className={tableClasses.td}>{item.uHeight}U</td>
+                    <td className={tableClasses.td}>
+                      {item.defaultWatts}
+                      <span className="text-slate-500"> / {item.peakWatts} peak</span>
+                    </td>
+                    <td className={tableClasses.td}>{heatBtu(item).toLocaleString()}</td>
+                    <td className={tableClasses.td}>{item.psuCount}</td>
+                    <td className={tableClasses.td}>{item.psuPlugType}</td>
+                    <td className={tableClasses.td}>
+                      {item.portCount}
+                      <span className="text-slate-500"> {item.portType}</span>
+                    </td>
+                    <td className={tableClasses.td}>{item.installedCount}</td>
+                    <td className={tableClasses.tdRight}>
+                      {admin && (
+                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => beginEdit(item)}
+                            className="text-cyan-400 hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => remove(item)}
+                            className="text-rose-300 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {admin && modalOpen && (
+        <Modal
+          title={editingId ? "Edit appliance" : "New appliance"}
+          onClose={closeModal}
+          wide
+        >
+          <AlertBanner error={error} />
+          <form onSubmit={save} className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Name">
+                <input
+                  required
+                  value={draft.name}
+                  onChange={(event) => setField("name", event.target.value)}
+                  placeholder="1U compute server"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Manufacturer">
+                <input
+                  required
+                  value={draft.manufacturer}
+                  onChange={(event) => setField("manufacturer", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Model">
+                <input
+                  required
+                  value={draft.model}
+                  onChange={(event) => setField("model", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Type">
+                <select
+                  value={draft.deviceType}
+                  onChange={(event) => setField("deviceType", event.target.value)}
+                  className={inputClass}
+                >
+                  {APPLIANCE_TYPES.map((type) => (
+                    <option key={type}>{type}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Height (U)">
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={58}
+                  value={draft.uHeight}
+                  onChange={(event) => setField("uHeight", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Weight (kg)">
+                <input
+                  required
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={draft.weightKg}
+                  onChange={(event) => setField("weightKg", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Watts">
+                <input
+                  required
+                  type="number"
+                  min={0}
+                  value={draft.defaultWatts}
+                  onChange={(event) => setField("defaultWatts", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Peak watts">
+                <input
+                  required
+                  type="number"
+                  min={0}
+                  value={draft.peakWatts}
+                  onChange={(event) => setField("peakWatts", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="BTU/h">
+                <input
+                  required
+                  type="number"
+                  min={0}
+                  value={draft.btuPerHour}
+                  onChange={(event) => {
+                    setBtuTouched(true);
+                    setField("btuPerHour", event.target.value);
+                  }}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="PSUs">
+                <input
+                  required
+                  type="number"
+                  min={0}
+                  max={8}
+                  value={draft.psuCount}
+                  onChange={(event) => setField("psuCount", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Plug">
+                <select
+                  value={draft.psuPlugType}
+                  onChange={(event) => setField("psuPlugType", event.target.value)}
+                  className={inputClass}
+                >
+                  {PLUG_TYPES.map((plug) => (
+                    <option key={plug}>{plug}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Ports">
+                <input
+                  required
+                  type="number"
+                  min={0}
+                  max={256}
+                  value={draft.portCount}
+                  onChange={(event) => setField("portCount", event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Port type">
+                <select
+                  value={draft.portType}
+                  onChange={(event) => setField("portType", event.target.value)}
+                  className={inputClass}
+                >
+                  {PORT_TYPES.map((port) => (
+                    <option key={port}>{port}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <ModalFooter
+              onCancel={closeModal}
+              submitLabel={editingId ? "Save appliance" : "Add appliance"}
+              saving={saving}
+              hint="BTU/h follows watts until you edit it. 1 W is about 3.412 BTU/h."
+            />
+          </form>
+        </Modal>
       )}
     </div>
-  );
-}
-
-const inputClass = "mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-xs text-slate-400">
-      {label}
-      {children}
-    </label>
   );
 }

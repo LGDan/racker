@@ -7,6 +7,7 @@ import { LocationCrumbs } from "@/components/location/LocationFrame";
 import { crumbsFor, findChain } from "@/components/location/model";
 import { deviceKind, suggestedCode } from "@/lib/suggested-code";
 import { applianceLabel, heatBtu } from "@/lib/appliance-catalog";
+import { AlertBanner, Modal, btnPrimary, btnSecondary, inputClass } from "@/components/ui/primitives";
 import {
   Cable,
   CheckCircle2,
@@ -537,230 +538,237 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
         </div>
       )}
 
-      {(error || message) && (
-        <div
-          className={`rounded-lg border px-3 py-2 text-xs ${
-            error
-              ? "border-rose-500/40 bg-rose-500/10 text-rose-100"
-              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
-          }`}
-        >
-          {error || message}
-        </div>
-      )}
+      <AlertBanner error={error} notice={message} />
 
       {showAdd && (
-        <form
-          onSubmit={addDevice}
-          className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-4 md:grid-cols-6"
-        >
-          <label className="text-xs text-slate-400 md:col-span-2">
-            <span className="flex items-center justify-between gap-2">
-              Catalog template
-              {role === "ADMIN" && (
-                <Link href="/catalog" className="text-cyan-400 hover:underline">
-                  Edit catalog
-                </Link>
-              )}
-            </span>
-            <select
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-              value={templateId}
-              onChange={(e) => applyTemplate(e.target.value)}
-            >
-              <option value="">Custom device</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {applianceLabel(t)}
-                </option>
-              ))}
-            </select>
-            {chosenTemplate && (
-              <span className="mt-1 block text-[11px] text-slate-500">
-                {chosenTemplate.uHeight}U · {chosenTemplate.defaultWatts} W ·{" "}
-                {heatBtu(chosenTemplate).toLocaleString()} BTU/h · {chosenTemplate.psuCount}×{" "}
-                {chosenTemplate.psuPlugType} · {chosenTemplate.portCount} {chosenTemplate.portType}
+        <Modal title="Install device" onClose={() => setShowAdd(false)} wide>
+          <form onSubmit={addDevice} className="grid gap-3 md:grid-cols-6">
+            <label className="text-xs font-medium text-slate-300 md:col-span-2">
+              <span className="flex items-center justify-between gap-2">
+                Catalog template
+                {role === "ADMIN" && (
+                  <Link href="/catalog" className="text-cyan-400 hover:underline">
+                    Edit catalog
+                  </Link>
+                )}
               </span>
-            )}
-          </label>
-          <Field label="Name" className="md:col-span-2">
-            <input
-              required
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <Field label="Short Code" className="md:col-span-2">
-            <input
-              required
-              value={hostname}
-              onChange={(e) => {
-                setHostnameTouched(true);
-                setHostname(e.target.value);
-              }}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 font-mono text-white"
-            />
-          </Field>
-          <Field label="Type">
-            <select
-              value={draft.deviceType}
-              onChange={(e) => setDraft({ ...draft, deviceType: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            >
-              {["SERVER", "SWITCH", "ROUTER", "FIREWALL", "STORAGE", "PATCH_PANEL", "UPS_RACK"].map(
-                (t) => (
-                  <option key={t}>{t}</option>
-                )
+              <select
+                className={inputClass}
+                value={templateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+              >
+                <option value="">Custom device</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {applianceLabel(t)}
+                  </option>
+                ))}
+              </select>
+              {chosenTemplate && (
+                <span className="mt-1 block font-normal text-[11px] text-slate-500">
+                  {chosenTemplate.uHeight}U · {chosenTemplate.defaultWatts} W ·{" "}
+                  {heatBtu(chosenTemplate).toLocaleString()} BTU/h · {chosenTemplate.psuCount}×{" "}
+                  {chosenTemplate.psuPlugType} · {chosenTemplate.portCount} {chosenTemplate.portType}
+                </span>
               )}
-            </select>
-          </Field>
-          <Field label="Start U">
-            <input
-              type="number"
-              min={1}
-              max={rack.totalU}
-              value={draft.startU}
-              onChange={(e) => setDraft({ ...draft, startU: Number(e.target.value) })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <Field label="Height U">
-            <input
-              type="number"
-              min={1}
-              value={draft.uHeight}
-              onChange={(e) => setDraft({ ...draft, uHeight: Number(e.target.value) })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <Field label="Watts">
-            <input
-              type="number"
-              value={draft.nominalWatts}
-              onChange={(e) => setDraft({ ...draft, nominalWatts: Number(e.target.value) })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <Field label="PSUs">
-            <input
-              type="number"
-              min={0}
-              value={draft.psuCount}
-              onChange={(e) => setDraft({ ...draft, psuCount: Number(e.target.value) })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <Field label="Plug">
-            <select
-              value={draft.psuPlugType}
-              onChange={(e) => setDraft({ ...draft, psuPlugType: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            >
-              <option>C14</option>
-              <option>C20</option>
-            </select>
-          </Field>
-          <Field label="Ports">
-            <input
-              type="number"
-              min={0}
-              value={draft.portCount}
-              onChange={(e) => setDraft({ ...draft, portCount: Number(e.target.value) })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <div className="flex items-end md:col-span-2">
-            <button
-              disabled={busy}
-              className="rounded-lg bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50"
-            >
-              {busy ? "Installing…" : "Place in rack"}
-            </button>
-          </div>
-        </form>
+            </label>
+            <Field label="Name" className="md:col-span-2">
+              <input
+                required
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Short Code" className="md:col-span-2">
+              <input
+                required
+                value={hostname}
+                onChange={(e) => {
+                  setHostnameTouched(true);
+                  setHostname(e.target.value);
+                }}
+                className={`${inputClass} font-mono`}
+              />
+            </Field>
+            <Field label="Type">
+              <select
+                value={draft.deviceType}
+                onChange={(e) => setDraft({ ...draft, deviceType: e.target.value })}
+                className={inputClass}
+              >
+                {["SERVER", "SWITCH", "ROUTER", "FIREWALL", "STORAGE", "PATCH_PANEL", "UPS_RACK"].map(
+                  (t) => (
+                    <option key={t}>{t}</option>
+                  )
+                )}
+              </select>
+            </Field>
+            <Field label="Start U">
+              <input
+                type="number"
+                min={1}
+                max={rack.totalU}
+                value={draft.startU}
+                onChange={(e) => setDraft({ ...draft, startU: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Height U">
+              <input
+                type="number"
+                min={1}
+                value={draft.uHeight}
+                onChange={(e) => setDraft({ ...draft, uHeight: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Watts">
+              <input
+                type="number"
+                value={draft.nominalWatts}
+                onChange={(e) => setDraft({ ...draft, nominalWatts: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="PSUs">
+              <input
+                type="number"
+                min={0}
+                value={draft.psuCount}
+                onChange={(e) => setDraft({ ...draft, psuCount: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Plug">
+              <select
+                value={draft.psuPlugType}
+                onChange={(e) => setDraft({ ...draft, psuPlugType: e.target.value })}
+                className={inputClass}
+              >
+                <option>C14</option>
+                <option>C20</option>
+              </select>
+            </Field>
+            <Field label="Ports">
+              <input
+                type="number"
+                min={0}
+                value={draft.portCount}
+                onChange={(e) => setDraft({ ...draft, portCount: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </Field>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-800 pt-3 md:col-span-6">
+              <button
+                type="button"
+                onClick={() => setShowAdd(false)}
+                className={btnSecondary}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={busy}
+                className={btnPrimary}
+              >
+                {busy ? "Installing…" : "Place in rack"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {showPdu && (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const ok = await operate({
-              action: "ADD_RACK_PDU",
-              rackId: rack.id,
-              name: pduDraft.name,
-              feedSide: pduDraft.feedSide,
-              mounting: pduDraft.mounting,
-              circuitId: pduDraft.circuitId || null,
-              phaseMode: "SINGLE_PHASE",
-              maxAmps: 32,
-              voltageV: 230,
-            });
-            if (ok) {
-              setShowPdu(false);
-              setMessage(`Added ${pduDraft.name}.`);
-            }
-          }}
-          className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-4 md:grid-cols-5"
-        >
-          <Field label="PDU name" className="md:col-span-2">
-            <input
-              required
-              value={pduDraft.name}
-              onChange={(e) => setPduDraft({ ...pduDraft, name: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            />
-          </Field>
-          <Field label="Feed">
-            <select
-              value={pduDraft.feedSide}
-              onChange={(e) =>
-                setPduDraft({
-                  ...pduDraft,
-                  feedSide: e.target.value,
-                  mounting: e.target.value === "B" ? "ZERO_U_RIGHT" : "ZERO_U_LEFT",
-                })
+        <Modal title="Add Rack PDU" onClose={() => setShowPdu(false)}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const ok = await operate({
+                action: "ADD_RACK_PDU",
+                rackId: rack.id,
+                name: pduDraft.name,
+                feedSide: pduDraft.feedSide,
+                mounting: pduDraft.mounting,
+                circuitId: pduDraft.circuitId || null,
+                phaseMode: "SINGLE_PHASE",
+                maxAmps: 32,
+                voltageV: 230,
+              });
+              if (ok) {
+                setShowPdu(false);
+                setMessage(`Added ${pduDraft.name}.`);
               }
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            >
-              <option value="A">A</option>
-              <option value="B">B</option>
-            </select>
-          </Field>
-          <Field label="Mounting">
-            <select
-              value={pduDraft.mounting}
-              onChange={(e) => setPduDraft({ ...pduDraft, mounting: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            >
-              <option value="ZERO_U_LEFT">ZERO_U_LEFT</option>
-              <option value="ZERO_U_RIGHT">ZERO_U_RIGHT</option>
-              <option value="RACKMOUNT">RACKMOUNT</option>
-            </select>
-          </Field>
-          <Field label="Floor socket">
-            <select
-              value={pduDraft.circuitId}
-              onChange={(e) => setPduDraft({ ...pduDraft, circuitId: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-            >
-              <option value="">None yet</option>
-              {roomCircuits.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.floorSocketLabel} · {c.phaseAllocation} · {c.ratedAmps}A
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="flex items-end">
-            <button
-              disabled={busy}
-              className="rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50"
-            >
-              {busy ? "Adding…" : "Add PDU"}
-            </button>
-          </div>
-        </form>
+            }}
+            className="space-y-3"
+          >
+            <Field label="PDU name">
+              <input
+                required
+                value={pduDraft.name}
+                onChange={(e) => setPduDraft({ ...pduDraft, name: e.target.value })}
+                className={inputClass}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Feed">
+                <select
+                  value={pduDraft.feedSide}
+                  onChange={(e) =>
+                    setPduDraft({
+                      ...pduDraft,
+                      feedSide: e.target.value,
+                      mounting: e.target.value === "B" ? "ZERO_U_RIGHT" : "ZERO_U_LEFT",
+                    })
+                  }
+                  className={inputClass}
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                </select>
+              </Field>
+              <Field label="Mounting">
+                <select
+                  value={pduDraft.mounting}
+                  onChange={(e) => setPduDraft({ ...pduDraft, mounting: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="ZERO_U_LEFT">ZERO_U_LEFT</option>
+                  <option value="ZERO_U_RIGHT">ZERO_U_RIGHT</option>
+                  <option value="RACKMOUNT">RACKMOUNT</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="Floor socket">
+              <select
+                value={pduDraft.circuitId}
+                onChange={(e) => setPduDraft({ ...pduDraft, circuitId: e.target.value })}
+                className={inputClass}
+              >
+                <option value="">None yet</option>
+                {roomCircuits.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.floorSocketLabel} · {c.phaseAllocation} · {c.ratedAmps}A
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowPdu(false)}
+                className={btnSecondary}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={busy}
+                className={btnPrimary}
+              >
+                {busy ? "Adding…" : "Add PDU"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -1160,7 +1168,7 @@ function Field({
   className?: string;
 }) {
   return (
-    <label className={`text-xs text-slate-400 ${className}`}>
+    <label className={`block text-xs font-medium text-slate-300 ${className}`}>
       {label}
       {children}
     </label>

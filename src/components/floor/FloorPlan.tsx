@@ -4,8 +4,17 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Box, Layers, Pencil } from "lucide-react";
+import { Box, Layers, Pencil, Plus } from "lucide-react";
 import { useTheme } from "@/components/layout/ThemeToggle";
+import {
+  Field,
+  Modal,
+  ModalFooter,
+  SectionCard,
+  btnPrimary,
+  inputClass,
+  tableClasses,
+} from "@/components/ui/primitives";
 import { floorTilePaint } from "./tile-theme";
 
 export type FloorLayer = "UNDERFLOOR" | "FLOOR" | "RACK" | "OVERHEAD";
@@ -804,9 +813,9 @@ export function FloorPlan({
           const name = unitName.trim();
           if (!name) {
             setError("Cooling unit name is required");
-            return;
+            return Promise.resolve(false);
           }
-          void postLayout({
+          return postLayout({
             entityType: "CREATE_COOLING_UNIT",
             roomId: room.id,
             name,
@@ -814,6 +823,7 @@ export function FloorPlan({
             capacityKw: unitKw,
           }).then((ok) => {
             if (ok) setUnitName("");
+            return ok;
           });
         }}
       />
@@ -832,7 +842,7 @@ export function FloorPlan({
         onGrillX={setGrillX}
         onGrillY={setGrillY}
         onAdd={() =>
-          void postLayout({
+          postLayout({
             entityType: "SET_FLOOR_TILE",
             roomId: room.id,
             posX: grillX,
@@ -887,8 +897,9 @@ function CoolingRegister({
   onCancelPlace: () => void;
   onUnplace: (id: string) => void;
   onDelete: (id: string) => void;
-  onCreate: () => void;
+  onCreate: () => Promise<boolean>;
 }) {
+  const [modalOpen, setModalOpen] = useState(false);
   const units = [...room.coolingUnits].sort((a, b) => {
     const placed = Number(onPlan(a.posX, a.posY)) - Number(onPlan(b.posX, b.posY));
     if (placed !== 0) return placed;
@@ -897,30 +908,39 @@ function CoolingRegister({
   const offPlan = units.filter((unit) => !onPlan(unit.posX, unit.posY));
 
   return (
-    <section className="rounded-xl border border-slate-800 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-800">
-        <h3 className="text-sm font-semibold text-white">Cooling for this room</h3>
-        <p className="text-[11px] text-slate-400 mt-1">
-          Air handlers and chillers that are not in this tile grid stay in this
-          list and still count toward the room cooling total.
-          {offPlan.length > 0
-            ? ` ${offPlan.length} ${offPlan.length === 1 ? "unit is" : "units are"} off the plan.`
-            : ""}
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-left text-slate-500">
-            <tr className="border-b border-slate-800">
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium">Capacity</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Location</th>
-              {editing && <th className="px-3 py-2 font-medium"> </th>}
+    <SectionCard
+      title="Cooling for this room"
+      subtitle={`Air handlers and chillers that are not in this tile grid stay in this list and still count toward the room cooling total.${
+        offPlan.length > 0
+          ? ` ${offPlan.length} ${offPlan.length === 1 ? "unit is" : "units are"} off the plan.`
+          : ""
+      }`}
+      actions={
+        admin && editing ? (
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className={btnPrimary}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add off-plan unit
+          </button>
+        ) : undefined
+      }
+    >
+      <div className={tableClasses.wrapper}>
+        <table className={tableClasses.table}>
+          <thead className={tableClasses.thead}>
+            <tr>
+              <th className={tableClasses.th}>Name</th>
+              <th className={tableClasses.th}>Type</th>
+              <th className={tableClasses.th}>Capacity</th>
+              <th className={tableClasses.th}>Status</th>
+              <th className={tableClasses.th}>Location</th>
+              {editing && <th className={tableClasses.thRight}> </th>}
             </tr>
           </thead>
-          <tbody>
+          <tbody className={tableClasses.tbody}>
             {units.length === 0 && (
               <tr>
                 <td colSpan={editing ? 6 : 5} className="px-4 py-3 text-slate-500">
@@ -931,16 +951,16 @@ function CoolingRegister({
             {units.map((unit) => {
               const placed = onPlan(unit.posX, unit.posY);
               return (
-                <tr key={unit.id} className="border-b border-slate-800/80 text-slate-200">
-                  <td className="px-4 py-2 font-medium">{unit.name}</td>
-                  <td className="px-3 py-2">{unit.unitType}</td>
-                  <td className="px-3 py-2">{unit.capacityKw} kW</td>
-                  <td className="px-3 py-2">{unit.status}</td>
-                  <td className="px-3 py-2">
+                <tr key={unit.id} className={tableClasses.tr}>
+                  <td className={`${tableClasses.td} font-medium text-white`}>{unit.name}</td>
+                  <td className={tableClasses.td}>{unit.unitType}</td>
+                  <td className={tableClasses.td}>{unit.capacityKw} kW</td>
+                  <td className={tableClasses.td}>{unit.status}</td>
+                  <td className={tableClasses.td}>
                     {placed ? `Tile ${unit.posX},${unit.posY}` : "Not on this plan"}
                   </td>
                   {editing && (
-                    <td className="px-3 py-2 text-right whitespace-nowrap space-x-2">
+                    <td className={`${tableClasses.tdRight} whitespace-nowrap space-x-2`}>
                       {placed ? (
                         <button
                           type="button"
@@ -980,58 +1000,59 @@ function CoolingRegister({
           </tbody>
         </table>
       </div>
-      {admin && editing && (
-        <form
-          className="flex flex-wrap items-end gap-2 px-4 py-3 border-t border-slate-800"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onCreate();
-          }}
-        >
-          <label className="space-y-1 text-slate-400">
-            <span>Off-plan unit</span>
-            <input
-              value={unitName}
-              onChange={(event) => onUnitName(event.target.value)}
-              placeholder="Roof AHU 1"
-              className="block w-40 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
-            />
-          </label>
-          <label className="space-y-1 text-slate-400">
-            <span>Type</span>
-            <select
-              value={unitType}
-              onChange={(event) =>
-                onUnitType(event.target.value as (typeof COOLING_TYPES)[number])
-              }
-              className="block rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
-            >
-              {COOLING_TYPES.map((type) => (
-                <option key={type}>{type}</option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1 text-slate-400">
-            <span>kW</span>
-            <input
-              type="number"
-              min={1}
-              step="any"
-              value={unitKw}
-              onChange={(event) => onUnitKw(Number(event.target.value))}
-              className="block w-20 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-3 py-1.5 rounded-md bg-sky-500 text-slate-950 font-semibold"
+      {admin && editing && modalOpen && (
+        <Modal title="Add off-plan cooling unit" onClose={() => setModalOpen(false)}>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const ok = await onCreate();
+              if (ok) setModalOpen(false);
+            }}
           >
-            Add off-plan unit
-          </button>
-        </form>
+            <Field label="Off-plan unit">
+              <input
+                required
+                value={unitName}
+                onChange={(event) => onUnitName(event.target.value)}
+                placeholder="Roof AHU 1"
+                className={inputClass}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Type">
+                <select
+                  value={unitType}
+                  onChange={(event) =>
+                    onUnitType(event.target.value as (typeof COOLING_TYPES)[number])
+                  }
+                  className={inputClass}
+                >
+                  {COOLING_TYPES.map((type) => (
+                    <option key={type}>{type}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Capacity (kW)">
+                <input
+                  type="number"
+                  min={1}
+                  step="any"
+                  value={unitKw}
+                  onChange={(event) => onUnitKw(Number(event.target.value))}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+            <ModalFooter
+              onCancel={() => setModalOpen(false)}
+              submitLabel="Add off-plan unit"
+              saving={saving}
+            />
+          </form>
+        </Modal>
       )}
-    </section>
+    </SectionCard>
   );
 }
 
@@ -1057,27 +1078,37 @@ function GrillRegister({
   grillY: number;
   onGrillX: (value: number) => void;
   onGrillY: (value: number) => void;
-  onAdd: () => void;
+  onAdd: () => Promise<boolean>;
   onRemove: (x: number, y: number) => void;
 }) {
+  const [modalOpen, setModalOpen] = useState(false);
+
   return (
-    <section className="rounded-xl border border-slate-800 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-800">
-        <h3 className="text-sm font-semibold text-white">Airflow grills</h3>
-        <p className="text-[11px] text-slate-400 mt-1">
-          {grills.length} grill {grills.length === 1 ? "tile" : "tiles"}. Add one
-          by coordinate, or click a tile on the Floor layer while editing.
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="text-left text-slate-500">
-            <tr className="border-b border-slate-800">
-              <th className="px-4 py-2 font-medium">Tile</th>
-              {editing && <th className="px-3 py-2 font-medium"> </th>}
+    <SectionCard
+      title="Airflow grills"
+      subtitle={`${grills.length} grill ${grills.length === 1 ? "tile" : "tiles"}. Add one by coordinate, or click a tile on the Floor layer while editing.`}
+      actions={
+        admin && editing ? (
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className={btnPrimary}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add grill
+          </button>
+        ) : undefined
+      }
+    >
+      <div className={tableClasses.wrapper}>
+        <table className={tableClasses.table}>
+          <thead className={tableClasses.thead}>
+            <tr>
+              <th className={tableClasses.th}>Tile</th>
+              {editing && <th className={tableClasses.thRight}> </th>}
             </tr>
           </thead>
-          <tbody>
+          <tbody className={tableClasses.tbody}>
             {grills.length === 0 && (
               <tr>
                 <td colSpan={editing ? 2 : 1} className="px-4 py-3 text-slate-500">
@@ -1088,10 +1119,10 @@ function GrillRegister({
             {grills.map((key) => {
               const [x, y] = key.split(",");
               return (
-                <tr key={key} className="border-b border-slate-800/80 text-slate-200">
-                  <td className="px-4 py-2">Tile {x},{y}</td>
+                <tr key={key} className={tableClasses.tr}>
+                  <td className={`${tableClasses.td} text-white`}>Tile {x},{y}</td>
                   {editing && (
-                    <td className="px-3 py-2 text-right">
+                    <td className={tableClasses.tdRight}>
                       <button
                         type="button"
                         disabled={saving}
@@ -1108,45 +1139,46 @@ function GrillRegister({
           </tbody>
         </table>
       </div>
-      {admin && editing && (
-        <form
-          className="flex flex-wrap items-end gap-2 px-4 py-3 border-t border-slate-800"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onAdd();
-          }}
-        >
-          <label className="space-y-1 text-slate-400">
-            <span>Column</span>
-            <input
-              type="number"
-              min={1}
-              max={room.gridCols}
-              value={grillX}
-              onChange={(event) => onGrillX(Number(event.target.value))}
-              className="block w-20 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
-            />
-          </label>
-          <label className="space-y-1 text-slate-400">
-            <span>Row</span>
-            <input
-              type="number"
-              min={1}
-              max={room.gridRows}
-              value={grillY}
-              onChange={(event) => onGrillY(Number(event.target.value))}
-              className="block w-20 rounded-md bg-slate-950 border border-slate-700 px-2 py-1 text-white"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-3 py-1.5 rounded-md bg-cyan-400 text-slate-950 font-semibold"
+      {admin && editing && modalOpen && (
+        <Modal title="Add airflow grill" onClose={() => setModalOpen(false)}>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const ok = await onAdd();
+              if (ok) setModalOpen(false);
+            }}
           >
-            Add grill
-          </button>
-        </form>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Column">
+                <input
+                  type="number"
+                  min={1}
+                  max={room.gridCols}
+                  value={grillX}
+                  onChange={(event) => onGrillX(Number(event.target.value))}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Row">
+                <input
+                  type="number"
+                  min={1}
+                  max={room.gridRows}
+                  value={grillY}
+                  onChange={(event) => onGrillY(Number(event.target.value))}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+            <ModalFooter
+              onCancel={() => setModalOpen(false)}
+              submitLabel="Add grill"
+              saving={saving}
+            />
+          </form>
+        </Modal>
       )}
-    </section>
+    </SectionCard>
   );
 }
