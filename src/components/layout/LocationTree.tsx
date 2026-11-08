@@ -8,6 +8,7 @@ import {
   Building2,
   ChevronRight,
   Columns3,
+  Cpu,
   Globe,
   Grid2x2,
   Layers,
@@ -107,7 +108,13 @@ function filterRoom(
 
 function filterRow(row: TreeRow, query: string): TreeRow[] {
   if (includes(query, row.name)) return [row];
-  const racks = row.racks.filter((rack) => includes(query, rack.code, rack.name));
+  const racks = row.racks.filter(
+    (rack) =>
+      includes(query, rack.code, rack.name) ||
+      (rack.devices || []).some((d) =>
+        includes(query, d.name, d.hostname || undefined, d.deviceType, `u${d.startU}`)
+      )
+  );
   return racks.length ? [{ ...row, racks }] : [];
 }
 
@@ -144,6 +151,10 @@ export function LocationTree({
   const activeSocketId = pathname.startsWith("/power-cooling")
     ? searchParams.get("socket") || ""
     : "";
+  const activeDeviceId =
+    pathname.startsWith("/appliances") || pathname.startsWith("/racks")
+      ? searchParams.get("device") || ""
+      : "";
   const rackId = pathname.match(/^\/racks\/([^/]+)/)?.[1] || "";
   const siteId = pathname.match(/^\/sites\/([^/]+)/)?.[1] || "";
   const buildingId = pathname.match(/^\/buildings\/([^/]+)/)?.[1] || "";
@@ -413,34 +424,89 @@ export function LocationTree({
                                                   <ul className="ml-5 space-y-0.5 py-0.5">
                                                     {row.racks.map((rack) => {
                                                       const metric = rackMetrics[rack.id];
-                                                      const rackSelected = rack.id === rackId;
+                                                      const rackSelected =
+                                                        rack.id === rackId && !activeDeviceId;
+                                                      const rackDevices = (
+                                                        rack.devices || []
+                                                      )
+                                                        .slice()
+                                                        .sort((a, b) => b.startU - a.startU);
                                                       return (
                                                         <li key={rack.id}>
-                                                          <Link
-                                                            href={`/racks/${rack.id}`}
-                                                            aria-label={rack.code}
-                                                            className={`flex items-center gap-1.5 rounded px-1.5 py-1 font-mono ${
-                                                              rackSelected
-                                                                ? "bg-cyan-500/15 text-cyan-100"
-                                                                : "text-slate-300 hover:bg-slate-800"
-                                                            }`}
-                                                          >
-                                                            <Server
-                                                              className={`h-3 w-3 shrink-0 ${
-                                                                rackSelected ? "text-cyan-400" : "text-slate-500"
-                                                              }`}
-                                                              aria-hidden="true"
+                                                          <div className="flex items-center gap-0.5">
+                                                            <BranchToggle
+                                                              open={isOpen(rack.id)}
+                                                              onClick={() => toggle(rack.id)}
                                                             />
-                                                            <span>{rack.code}</span>
-                                                            <span className="truncate font-sans text-[10px] text-slate-500">
-                                                              {rack.name}
-                                                            </span>
-                                                            {metric && (
-                                                              <span className="ml-auto shrink-0 font-sans text-[10px] text-slate-500">
-                                                                {metric.usedU}/{metric.totalU}U
+                                                            <Link
+                                                              href={`/racks/${rack.id}`}
+                                                              aria-label={rack.code}
+                                                              className={`min-w-0 flex-1 flex items-center gap-1.5 rounded px-1.5 py-1 font-mono ${
+                                                                rackSelected
+                                                                  ? "bg-cyan-500/15 text-cyan-100"
+                                                                  : "text-slate-300 hover:bg-slate-800"
+                                                              }`}
+                                                            >
+                                                              <Server
+                                                                className={`h-3 w-3 shrink-0 ${
+                                                                  rackSelected
+                                                                    ? "text-cyan-400"
+                                                                    : "text-slate-500"
+                                                                }`}
+                                                                aria-hidden="true"
+                                                              />
+                                                              <span>{rack.code}</span>
+                                                              <span className="truncate font-sans text-[10px] text-slate-500">
+                                                                {rack.name}
                                                               </span>
-                                                            )}
-                                                          </Link>
+                                                              {metric && (
+                                                                <span className="ml-auto shrink-0 font-sans text-[10px] text-slate-500">
+                                                                  {metric.usedU}/{metric.totalU}U
+                                                                </span>
+                                                              )}
+                                                            </Link>
+                                                          </div>
+                                                          {isOpen(rack.id) && (
+                                                            <ul className="ml-5 space-y-0.5 border-l border-slate-800/80 pl-1 py-0.5">
+                                                              {rackDevices.length === 0 ? (
+                                                                <li className="px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                                  No appliances installed
+                                                                </li>
+                                                              ) : (
+                                                                rackDevices.map((dev) => {
+                                                                  const devSelected =
+                                                                    activeDeviceId === dev.id;
+                                                                  return (
+                                                                    <li key={dev.id}>
+                                                                      <Link
+                                                                        href={`/appliances?device=${encodeURIComponent(dev.id)}`}
+                                                                        className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] ${
+                                                                          devSelected
+                                                                            ? "bg-cyan-500/15 text-cyan-100"
+                                                                            : "text-slate-300 hover:bg-slate-800"
+                                                                        }`}
+                                                                      >
+                                                                        <Cpu
+                                                                          className={`h-3 w-3 shrink-0 ${
+                                                                            devSelected
+                                                                              ? "text-cyan-400"
+                                                                              : "text-emerald-400"
+                                                                          }`}
+                                                                          aria-hidden="true"
+                                                                        />
+                                                                        <span className="truncate font-medium">
+                                                                          {dev.name}
+                                                                        </span>
+                                                                        <span className="ml-auto shrink-0 font-mono text-[10px] text-slate-500">
+                                                                          U{dev.startU}
+                                                                        </span>
+                                                                      </Link>
+                                                                    </li>
+                                                                  );
+                                                                })
+                                                              )}
+                                                            </ul>
+                                                          )}
                                                         </li>
                                                       );
                                                     })}

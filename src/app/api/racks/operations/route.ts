@@ -195,6 +195,112 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: updated });
     }
 
+    if (action === "UPDATE_DEVICE") {
+      const {
+        deviceId,
+        rackId,
+        name,
+        hostname,
+        assetTag,
+        serialNumber,
+        deviceType,
+        manufacturer,
+        model,
+        startU,
+        uHeight,
+        status,
+        nominalWatts,
+        peakWatts,
+        weightKg,
+      } = body;
+
+      const dev = await prisma.rackDevice.findUnique({
+        where: { id: String(deviceId || "") },
+      });
+      if (!dev) {
+        return NextResponse.json(
+          { error: "Device not found" },
+          { status: 404 }
+        );
+      }
+
+      const targetRackId = String(rackId || dev.rackId);
+      const targetRack = await prisma.rack.findUnique({
+        where: { id: targetRackId },
+        include: { devices: true },
+      });
+      if (!targetRack) {
+        return NextResponse.json({ error: "Rack not found" }, { status: 404 });
+      }
+
+      const sU = Number(startU ?? dev.startU);
+      const uH = Number(uHeight ?? dev.uHeight);
+      const endU = sU + uH - 1;
+      if (sU < 1 || uH < 1 || endU > targetRack.totalU) {
+        return NextResponse.json(
+          {
+            error: `Target U${sU}-U${endU} exceeds rack height (${targetRack.totalU}U).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      for (const other of targetRack.devices) {
+        if (other.id === dev.id) continue;
+        const oStart = other.startU;
+        const oEnd = other.startU + other.uHeight - 1;
+        if (sU <= oEnd && endU >= oStart) {
+          return NextResponse.json(
+            {
+              error: `U-Slot collision: U${sU}-U${endU} overlaps with ${other.name} (U${oStart}-U${oEnd}).`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      const updated = await prisma.rackDevice.update({
+        where: { id: dev.id },
+        data: {
+          rackId: targetRackId,
+          name: String(name || dev.name).trim(),
+          hostname:
+            hostname !== undefined
+              ? String(hostname || "").trim() || null
+              : dev.hostname,
+          assetTag:
+            assetTag !== undefined
+              ? String(assetTag || "").trim() || null
+              : dev.assetTag,
+          serialNumber:
+            serialNumber !== undefined
+              ? String(serialNumber || "").trim() || null
+              : dev.serialNumber,
+          deviceType: deviceType || dev.deviceType,
+          manufacturer: String(manufacturer ?? dev.manufacturer).trim(),
+          model: String(model ?? dev.model).trim(),
+          startU: sU,
+          uHeight: uH,
+          status: status || dev.status,
+          nominalWatts: Number(nominalWatts ?? dev.nominalWatts),
+          peakWatts: Number(peakWatts ?? dev.peakWatts),
+          weightKg: Number(weightKg ?? dev.weightKg),
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "UPDATE_RACK_DEVICE",
+          entityType: "RACK_DEVICE",
+          entityId: updated.id,
+          details: `Updated ${updated.name} (U${updated.startU}, ${updated.uHeight}U, ${updated.nominalWatts}W) in rack ${targetRack.code}`,
+        },
+      });
+
+      return NextResponse.json({ item: updated });
+    }
+
     if (action === "DELETE_DEVICE") {
       const { deviceId } = body;
       await prisma.rackDevice.delete({ where: { id: deviceId } });

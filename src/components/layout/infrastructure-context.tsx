@@ -475,7 +475,31 @@ export function InfrastructureProvider({
   const buildingId = pathname.match(/^\/buildings\/([^/]+)/)?.[1] || "";
   const floorId = pathname.match(/^\/floors\/([^/]+)/)?.[1] || "";
   const rowId = pathname.match(/^\/rows\/([^/]+)/)?.[1] || "";
-  const rackId = pathname.match(/^\/racks\/([^/]+)/)?.[1] || "";
+  const rackPathId = pathname.match(/^\/racks\/([^/]+)/)?.[1] || "";
+  const deviceQuery =
+    pathname.startsWith("/appliances") || pathname.startsWith("/racks")
+      ? searchParams.get("device") || ""
+      : "";
+  const rackFromDevice = useMemo(() => {
+    if (!deviceQuery) return "";
+    for (const s of sites) {
+      for (const b of s.buildings) {
+        for (const f of b.floors) {
+          for (const rm of f.rooms) {
+            for (const rw of rm.rows) {
+              for (const rk of rw.racks) {
+                if ((rk.devices || []).some((d) => d.id === deviceQuery)) {
+                  return rk.id;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return "";
+  }, [sites, deviceQuery]);
+  const rackId = rackPathId || rackFromDevice;
   const panelQuery = pathname.startsWith("/power-cooling")
     ? searchParams.get("panel") || ""
     : "";
@@ -502,6 +526,9 @@ export function InfrastructureProvider({
 
   useEffect(() => {
     const ids = ancestorIds(sites, { siteId, buildingId, floorId, roomId, rowId, rackId });
+    if (deviceQuery && rackId) {
+      ids.push(rackId);
+    }
     if (roomFromPower) {
       ids.push(roomFromPower);
     }
@@ -535,6 +562,7 @@ export function InfrastructureProvider({
     roomId,
     rowId,
     rackId,
+    deviceQuery,
     roomFromPower,
     panelQuery,
     phaseQuery,

@@ -7,6 +7,7 @@ import {
   BarChart3,
   Building2,
   ChevronDown,
+  Cpu,
   HardDrive,
   LayoutDashboard,
   Library,
@@ -112,6 +113,13 @@ function ShellFrame({ user, firstRackId, children }: AppShellProps) {
       href: rackTarget ? `/racks/${rackTarget}` : "/racks",
       icon: HardDrive,
       active: pathname.startsWith("/racks"),
+    },
+    {
+      label: "Appliances",
+      title: "Installed Rack Appliances",
+      href: "/appliances",
+      icon: Cpu,
+      active: pathname.startsWith("/appliances"),
     },
     {
       label: "Catalog",

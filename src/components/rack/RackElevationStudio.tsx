@@ -244,6 +244,21 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showPdu, setShowPdu] = useState(false);
+  const [showEditDevice, setShowEditDevice] = useState(false);
+  const [editDeviceDraft, setEditDeviceDraft] = useState({
+    name: "",
+    hostname: "",
+    assetTag: "",
+    deviceType: "SERVER",
+    manufacturer: "",
+    model: "",
+    startU: 1,
+    uHeight: 1,
+    status: "ACTIVE",
+    nominalWatts: 500,
+    peakWatts: 800,
+    weightKg: 20,
+  });
   const [pduTemplateId, setPduTemplateId] = useState("");
   const [pduDraft, setPduDraft] = useState<{
     name: string;
@@ -1277,15 +1292,40 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           )}
           {selected && (
             <div className="space-y-4">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  {selected.deviceType}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    {selected.deviceType}
+                  </div>
+                  <h2 className="text-base font-bold text-white">{selected.name}</h2>
+                  <p className="text-xs text-slate-400">
+                    {selected.manufacturer} {selected.model}
+                    {selected.hostname ? ` · ${selected.hostname}` : ""}
+                  </p>
                 </div>
-                <h2 className="text-base font-bold text-white">{selected.name}</h2>
-                <p className="text-xs text-slate-400">
-                  {selected.manufacturer} {selected.model}
-                  {selected.hostname ? ` · ${selected.hostname}` : ""}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditDeviceDraft({
+                      name: selected.name,
+                      hostname: selected.hostname || "",
+                      assetTag: selected.assetTag || "",
+                      deviceType: selected.deviceType,
+                      manufacturer: selected.manufacturer,
+                      model: selected.model,
+                      startU: selected.startU,
+                      uHeight: selected.uHeight,
+                      status: selected.status || "ACTIVE",
+                      nominalWatts: selected.nominalWatts,
+                      peakWatts: selected.peakWatts,
+                      weightKg: selected.weightKg,
+                    });
+                    setShowEditDevice(true);
+                  }}
+                  className={btnSecondary}
+                >
+                  Edit appliance
+                </button>
               </div>
               <div className="flex items-end gap-2">
                 <label className="text-xs text-slate-400">
@@ -1462,6 +1502,192 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           </Link>
         </aside>
       </div>
+
+      {showEditDevice && selected && (
+        <Modal
+          title={`Edit appliance — ${selected.name}`}
+          onClose={() => setShowEditDevice(false)}
+          wide
+        >
+          <form
+            className="grid gap-3 sm:grid-cols-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const ok = await operate({
+                action: "UPDATE_DEVICE",
+                deviceId: selected.id,
+                rackId: rack.id,
+                ...editDeviceDraft,
+              });
+              if (ok) {
+                setShowEditDevice(false);
+                setMessage(`Updated ${editDeviceDraft.name}.`);
+              }
+            }}
+          >
+            <Field label="Name">
+              <input
+                required
+                value={editDeviceDraft.name}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, name: e.target.value })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Short Code">
+              <input
+                value={editDeviceDraft.hostname}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, hostname: e.target.value })
+                }
+                className={`${inputClass} font-mono`}
+              />
+            </Field>
+            <Field label="Type">
+              <select
+                value={editDeviceDraft.deviceType}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, deviceType: e.target.value })
+                }
+                className={inputClass}
+              >
+                {["SERVER", "SWITCH", "ROUTER", "FIREWALL", "STORAGE", "PATCH_PANEL", "UPS_RACK"].map(
+                  (t) => (
+                    <option key={t}>{t}</option>
+                  )
+                )}
+              </select>
+            </Field>
+            <Field label="Manufacturer">
+              <input
+                required
+                value={editDeviceDraft.manufacturer}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, manufacturer: e.target.value })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Model">
+              <input
+                required
+                value={editDeviceDraft.model}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, model: e.target.value })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Status">
+              <select
+                value={editDeviceDraft.status}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, status: e.target.value })
+                }
+                className={inputClass}
+              >
+                {["ACTIVE", "PROVISIONING", "MAINTENANCE", "OFFLINE"].map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Start U">
+              <input
+                type="number"
+                min={1}
+                max={rack.totalU}
+                value={editDeviceDraft.startU}
+                onChange={(e) =>
+                  setEditDeviceDraft({
+                    ...editDeviceDraft,
+                    startU: Number(e.target.value),
+                  })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Height U">
+              <input
+                type="number"
+                min={1}
+                value={editDeviceDraft.uHeight}
+                onChange={(e) =>
+                  setEditDeviceDraft({
+                    ...editDeviceDraft,
+                    uHeight: Number(e.target.value),
+                  })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Nominal watts">
+              <input
+                type="number"
+                min={0}
+                value={editDeviceDraft.nominalWatts}
+                onChange={(e) =>
+                  setEditDeviceDraft({
+                    ...editDeviceDraft,
+                    nominalWatts: Number(e.target.value),
+                  })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Peak watts">
+              <input
+                type="number"
+                min={0}
+                value={editDeviceDraft.peakWatts}
+                onChange={(e) =>
+                  setEditDeviceDraft({
+                    ...editDeviceDraft,
+                    peakWatts: Number(e.target.value),
+                  })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Weight (kg)">
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                value={editDeviceDraft.weightKg}
+                onChange={(e) =>
+                  setEditDeviceDraft({
+                    ...editDeviceDraft,
+                    weightKg: Number(e.target.value),
+                  })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Asset tag">
+              <input
+                value={editDeviceDraft.assetTag}
+                onChange={(e) =>
+                  setEditDeviceDraft({ ...editDeviceDraft, assetTag: e.target.value })
+                }
+                className={inputClass}
+              />
+            </Field>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-800 pt-3 sm:col-span-3">
+              <button
+                type="button"
+                onClick={() => setShowEditDevice(false)}
+                className={btnSecondary}
+              >
+                Cancel
+              </button>
+              <button disabled={busy} className={btnPrimary}>
+                {busy ? "Saving…" : "Save appliance"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
