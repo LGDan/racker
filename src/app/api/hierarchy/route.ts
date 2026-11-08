@@ -19,8 +19,9 @@ export async function GET() {
                   floorTiles: true,
                   obstructions: true,
                   rows: {
+                    orderBy: { createdAt: "asc" },
                     include: {
-                      racks: true,
+                      racks: { orderBy: [{ posY: "asc" }, { posX: "asc" }] },
                     },
                   },
                 },
@@ -267,6 +268,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: room });
     }
 
+    if (typeof entityType === "string" && entityType.startsWith("UPDATE_")) {
+      const item = await updateHierarchyEntity(entityType, body);
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: entityType,
+          entityType: entityType.replace("UPDATE_", ""),
+          entityId: String(body.id || ""),
+          details: `Updated ${entityType.replace("UPDATE_", "").toLowerCase()} ${item.name}`,
+        },
+      });
+      return NextResponse.json({ item });
+    }
+
     if (entityType === "DELETE") {
       const { targetType, id } = body;
       if (targetType === "SITE") await prisma.site.delete({ where: { id } });
@@ -297,6 +312,129 @@ export async function POST(req: NextRequest) {
       { status }
     );
   }
+}
+
+const ROOM_TYPES = ["DATA_HALL", "POWER_ROOM", "COOLING_PLANT", "MEET_ME"];
+const REDUNDANCY = ["N", "N_PLUS_1", "TWO_N"];
+const ORIENTATIONS = ["HORIZONTAL", "VERTICAL"];
+const CONTAINMENT = ["NONE", "HOT_AISLE", "COLD_AISLE"];
+
+function requiredText(value: unknown, label: string) {
+  const text = String(value ?? "").trim();
+  if (!text) throw new FloorError(`${label} is required`);
+  return text;
+}
+
+function requiredNumber(value: unknown, label: string) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new FloorError(`${label} must be a number`);
+  return number;
+}
+
+function requiredInt(value: unknown, label: string) {
+  const number = Number(value);
+  if (!Number.isInteger(number)) throw new FloorError(`${label} must be a whole number`);
+  return number;
+}
+
+function oneOf(value: unknown, allowed: string[], label: string) {
+  const text = String(value ?? "");
+  if (!allowed.includes(text)) throw new FloorError(`${label} is not valid`);
+  return text;
+}
+
+async function updateHierarchyEntity(entityType: string, body: Record<string, unknown>) {
+  const id = String(body.id || "");
+  if (!id) throw new FloorError("Missing id");
+  const name = requiredText(body.name, "Name");
+
+  if (entityType === "UPDATE_SITE") {
+    const code = requiredText(body.code, "Code").toUpperCase();
+    const current = await prisma.site.findUnique({ where: { id } });
+    if (!current) throw new FloorError("Site not found", 404);
+    const clash = await prisma.site.findFirst({ where: { code, NOT: { id } } });
+    if (clash) throw new FloorError("A site with that code already exists.");
+    const pueTarget = requiredNumber(body.pueTarget, "PUE target");
+    if (pueTarget <= 0) throw new FloorError("PUE target must be greater than zero");
+    return prisma.site.update({
+      where: { id },
+      data: {
+        name,
+        code,
+        address: String(body.address ?? "").trim(),
+        city: String(body.city ?? "").trim(),
+        country: String(body.country ?? "").trim(),
+        utilityCapacityKw: requiredNumber(body.utilityCapacityKw, "Utility capacity"),
+        pueTarget,
+      },
+    });
+  }
+
+  if (entityType === "UPDATE_BUILDING") {
+    const current = await prisma.building.findUnique({ where: { id } });
+    if (!current) throw new FloorError("Building not found", 404);
+    return prisma.building.update({
+      where: { id },
+      data: { name, code: requiredText(body.code, "Code").toUpperCase() },
+    });
+  }
+
+  if (entityType === "UPDATE_FLOOR") {
+    const current = await prisma.floor.findUnique({ where: { id } });
+    if (!current) throw new FloorError("Floor not found", 404);
+    return prisma.floor.update({
+      where: { id },
+      data: { name, levelNumber: requiredInt(body.levelNumber, "Level number") },
+    });
+  }
+
+  if (entityType === "UPDATE_ROOM") {
+    const current = await prisma.room.findUnique({ where: { id } });
+    if (!current) throw new FloorError("Room not found", 404);
+    return prisma.room.update({
+      where: { id },
+      data: {
+        name,
+        code: requiredText(body.code, "Code").toUpperCase(),
+        roomType: oneOf(body.roomType, ROOM_TYPES, "Room type"),
+        coolingCapacityKw: requiredNumber(body.coolingCapacityKw, "Cooling capacity"),
+        coolingRedundancy: oneOf(body.coolingRedundancy, REDUNDANCY, "Redundancy"),
+        ambientTempTargetC: requiredNumber(body.ambientTempTargetC, "Target temperature"),
+      },
+    });
+  }
+
+  if (entityType === "UPDATE_ROW") {
+    const current = await prisma.row.findUnique({ where: { id } });
+    if (!current) throw new FloorError("Row not found", 404);
+    return prisma.row.update({
+      where: { id },
+      data: {
+        name,
+        orientation: oneOf(body.orientation, ORIENTATIONS, "Orientation"),
+        aisleContainment: oneOf(body.aisleContainment, CONTAINMENT, "Aisle containment"),
+      },
+    });
+  }
+
+  if (entityType === "UPDATE_RACK") {
+    const current = await prisma.rack.findUnique({ where: { id } });
+    if (!current) throw new FloorError("Rack not found", 404);
+    const totalU = requiredInt(body.totalU, "Height");
+    if (totalU < 1) throw new FloorError("Height must be at least 1U");
+    return prisma.rack.update({
+      where: { id },
+      data: {
+        name,
+        code: requiredText(body.code, "Code").toUpperCase(),
+        totalU,
+        maxPowerWatts: requiredNumber(body.maxPowerWatts, "Max power"),
+        maxWeightKg: requiredNumber(body.maxWeightKg, "Max weight"),
+      },
+    });
+  }
+
+  throw new FloorError("Unsupported entityType");
 }
 
 class FloorError extends Error {

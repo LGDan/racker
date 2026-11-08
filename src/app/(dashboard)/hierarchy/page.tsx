@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, Plus, ShieldAlert } from "lucide-react";
 import { FloorPlan } from "@/components/floor/FloorPlan";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
+import { CapacityStrip, LocationCrumbs } from "@/components/location/LocationFrame";
+import { crumbsFor, findChain, rollupRooms } from "@/components/location/model";
 
 function FloorExplorer() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { loading, role, sites, circuits, rackMetrics, openAdd, refresh } =
+  const { loading, role, sites, circuits, rackMetrics, openAdd, openEdit, refresh } =
     useInfrastructure();
   const requestedRoomId = searchParams.get("room") || "";
 
@@ -28,6 +30,7 @@ function FloorExplorer() {
   );
   const activeRoom =
     allRooms.find((room) => room.id === requestedRoomId) || allRooms[0];
+  const roomChain = activeRoom ? findChain(sites, "room", activeRoom.id) : null;
 
   useEffect(() => {
     if (loading || !activeRoom) return;
@@ -109,14 +112,26 @@ function FloorExplorer() {
 
       {activeRoom ? (
         <div className="space-y-5 rounded-xl border border-slate-800 bg-slate-900/90 p-5">
-          <div className="border-b border-slate-800 pb-4">
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-xs font-bold text-cyan-300">
-                {activeRoom.code}
-              </span>
-              <h2 className="text-lg font-bold text-white">
-                {activeRoom.name} — Raised-Floor Plan
-              </h2>
+          <div className="space-y-3 border-b border-slate-800 pb-4">
+            {roomChain && <LocationCrumbs crumbs={crumbsFor(roomChain, "room")} />}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-xs font-bold text-cyan-300">
+                  {activeRoom.code}
+                </span>
+                <h2 className="text-lg font-bold text-white">
+                  {activeRoom.name} — Raised-Floor Plan
+                </h2>
+              </div>
+              {role === "ADMIN" && (
+                <button
+                  type="button"
+                  onClick={() => openEdit("ROOM", activeRoom.id)}
+                  className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
+                >
+                  Edit
+                </button>
+              )}
             </div>
             <p className="mt-1 text-xs text-slate-400">
               {activeRoom.siteName} → {activeRoom.buildingName} → {activeRoom.floorName}{" "}
@@ -126,6 +141,7 @@ function FloorExplorer() {
               </strong>{" "}
               • Target Temp: {activeRoom.ambientTempTargetC}°C
             </p>
+            <CapacityStrip rollup={rollupRooms([activeRoom], rackMetrics)} />
           </div>
           <FloorPlan
             room={activeRoom}

@@ -188,8 +188,10 @@ export async function getFullInfrastructureSnapshot() {
                     floorTiles: true,
                     obstructions: true,
                     rows: {
+                      orderBy: { createdAt: "asc" },
                       include: {
                         racks: {
+                          orderBy: [{ posY: "asc" }, { posX: "asc" }],
                           include: {
                             devices: {
                               select: {

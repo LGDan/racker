@@ -2,6 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useInfrastructure } from "@/components/layout/infrastructure-context";
+import { LocationCrumbs } from "@/components/location/LocationFrame";
+import { crumbsFor, findChain } from "@/components/location/model";
 import {
   Cable,
   CheckCircle2,
@@ -182,6 +185,7 @@ function portCable(port: NetPort) {
 }
 
 export function RackElevationStudio({ rackId }: { rackId: string }) {
+  const { role, sites, openEdit } = useInfrastructure();
   const [rack, setRack] = useState<Rack | null>(null);
   const [allRacks, setAllRacks] = useState<{ id: string; code: string; name: string }[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -399,11 +403,20 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
       }))
   );
 
+  const rackChain = findChain(sites, "rack", rack.id);
+  const rackCrumbs = rackChain
+    ? [
+        ...crumbsFor(rackChain, "rack"),
+        { label: rack.code },
+      ]
+    : [];
+
   return (
     <div className="p-6 lg:p-8 space-y-5">
       <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-widest text-cyan-400">
+          {rackCrumbs.length > 0 && <LocationCrumbs crumbs={rackCrumbs} />}
+          <div className="mt-2 text-xs font-semibold uppercase tracking-widest text-cyan-400">
             Interactive rack elevation
           </div>
           <h1 className="mt-1 text-2xl font-bold text-white">
@@ -416,6 +429,15 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {role === "ADMIN" && (
+            <button
+              type="button"
+              onClick={() => openEdit("RACK", rack.id, load)}
+              className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800"
+            >
+              Edit
+            </button>
+          )}
           <label className="text-xs text-slate-400">
             Rack
             <select

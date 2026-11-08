@@ -71,8 +71,11 @@ export function LocationTree({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const roomId = searchParams.get("room") || "";
-  const rackMatch = pathname.match(/^\/racks\/([^/]+)/);
-  const rackId = rackMatch?.[1] || "";
+  const rackId = pathname.match(/^\/racks\/([^/]+)/)?.[1] || "";
+  const siteId = pathname.match(/^\/sites\/([^/]+)/)?.[1] || "";
+  const buildingId = pathname.match(/^\/buildings\/([^/]+)/)?.[1] || "";
+  const floorId = pathname.match(/^\/floors\/([^/]+)/)?.[1] || "";
+  const rowId = pathname.match(/^\/rows\/([^/]+)/)?.[1] || "";
   const searching = query.trim().length > 0;
   const visible = filterSites(sites, query.trim().toLowerCase());
   const admin = role === "ADMIN";
@@ -146,7 +149,17 @@ export function LocationTree({
                   open={isOpen(site.id)}
                   onClick={() => toggle(site.id)}
                 />
-                <span className="truncate font-semibold text-white">{site.name}</span>
+                <Link
+                  href={`/sites/${site.id}`}
+                  aria-current={site.id === siteId ? "page" : undefined}
+                  className={`min-w-0 truncate rounded-md px-1 py-0.5 font-semibold ${
+                    site.id === siteId
+                      ? "bg-cyan-500/15 text-white"
+                      : "text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {site.name}
+                </Link>
                 <span className="shrink-0 text-[10px] font-bold text-cyan-300">{site.code}</span>
                 {admin && (
                   <button
@@ -167,9 +180,17 @@ export function LocationTree({
                           open={isOpen(building.id)}
                           onClick={() => toggle(building.id)}
                         />
-                        <span className="truncate font-medium text-slate-200">
+                        <Link
+                          href={`/buildings/${building.id}`}
+                          aria-current={building.id === buildingId ? "page" : undefined}
+                          className={`min-w-0 truncate rounded-md px-1 py-0.5 font-medium ${
+                            building.id === buildingId
+                              ? "bg-cyan-500/15 text-white"
+                              : "text-slate-200 hover:bg-slate-800"
+                          }`}
+                        >
                           {building.name} ({building.code})
-                        </span>
+                        </Link>
                         {admin && (
                           <button
                             type="button"
@@ -189,9 +210,17 @@ export function LocationTree({
                                   open={isOpen(floor.id)}
                                   onClick={() => toggle(floor.id)}
                                 />
-                                <span className="truncate">
+                                <Link
+                                  href={`/floors/${floor.id}`}
+                                  aria-current={floor.id === floorId ? "page" : undefined}
+                                  className={`min-w-0 truncate rounded-md px-1 py-0.5 ${
+                                    floor.id === floorId
+                                      ? "bg-cyan-500/15 text-white"
+                                      : "hover:bg-slate-800 hover:text-slate-200"
+                                  }`}
+                                >
                                   Level {floor.levelNumber}: {floor.name}
-                                </span>
+                                </Link>
                                 {admin && (
                                   <button
                                     type="button"
@@ -242,9 +271,17 @@ export function LocationTree({
                                                     open={isOpen(row.id)}
                                                     onClick={() => toggle(row.id)}
                                                   />
-                                                  <span className="truncate text-slate-300">
+                                                  <Link
+                                                    href={`/rows/${row.id}`}
+                                                    aria-current={row.id === rowId ? "page" : undefined}
+                                                    className={`min-w-0 truncate rounded-md px-1 py-0.5 ${
+                                                      row.id === rowId
+                                                        ? "bg-cyan-500/15 text-white"
+                                                        : "text-slate-300 hover:bg-slate-800"
+                                                    }`}
+                                                  >
                                                     {row.name}
-                                                  </span>
+                                                  </Link>
                                                   {admin && (
                                                     <button
                                                       type="button"

@@ -96,7 +96,12 @@ function ShellFrame({ user, firstRackId, children }: AppShellProps) {
       title: "Hierarchy & Floor Plans",
       href: floorRoom ? `/hierarchy?room=${floorRoom}` : "/hierarchy",
       icon: Building2,
-      active: pathname.startsWith("/hierarchy"),
+      active:
+        pathname.startsWith("/hierarchy") ||
+        pathname.startsWith("/sites") ||
+        pathname.startsWith("/buildings") ||
+        pathname.startsWith("/floors") ||
+        pathname.startsWith("/rows"),
     },
     {
       label: "Rack",
