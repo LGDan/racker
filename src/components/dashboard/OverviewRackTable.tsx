@@ -95,7 +95,7 @@ export function OverviewRackTable({ racks }: { racks: OverviewRackRow[] }) {
                 <div className="font-mono text-white font-semibold">
                   {(rack.currentPowerWatts / 1000).toFixed(2)} kW{" "}
                   <span className="text-[11px] font-normal text-slate-400">
-                    / {(rack.maxPowerWatts / 1000).toFixed(0)}kW
+                    / {(rack.maxPowerWatts / 1000).toFixed(1)} kW PDU
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">

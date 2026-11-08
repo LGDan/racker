@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
           name: body.name,
           code: storedCode(body.code, "R-NEW"),
           totalU: Number(body.totalU || 42),
-          maxPowerWatts: Number(body.maxPowerWatts || 12000),
+          maxPowerWatts: Number(body.maxPowerWatts ?? 0),
           maxWeightKg: Number(body.maxWeightKg || 1200),
           posX: Number(body.posX || 2),
           posY: Number(body.posY || 3),
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
           action: "CREATE_RACK",
           entityType: "RACK",
           entityId: created.id,
-          details: `Created rack ${created.code} (${created.totalU}U, ${created.maxPowerWatts}W)`,
+          details: `Created rack ${created.code} (${created.totalU}U)`,
         },
       });
       return NextResponse.json({ item: created });
@@ -442,17 +442,23 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
   }
 
   if (entityType === "UPDATE_RACK") {
-    const current = await prisma.rack.findUnique({ where: { id } });
+    const current = await prisma.rack.findUnique({
+      where: { id },
+      include: { pdus: { where: { status: { not: "OFFLINE" } } } },
+    });
     if (!current) throw new FloorError("Rack not found", 404);
     const totalU = requiredInt(body.totalU, "Height");
     if (totalU < 1) throw new FloorError("Height must be at least 1U");
+    const pduCapacityWatts = Math.round(
+      current.pdus.reduce((sum, p) => sum + (p.maxWatts || 0), 0)
+    );
     return prisma.rack.update({
       where: { id },
       data: {
         name,
         code: requiredText(body.code, "Code"),
         totalU,
-        maxPowerWatts: requiredNumber(body.maxPowerWatts, "Max power"),
+        maxPowerWatts: pduCapacityWatts,
         maxWeightKg: requiredNumber(body.maxWeightKg, "Max weight"),
       },
     });

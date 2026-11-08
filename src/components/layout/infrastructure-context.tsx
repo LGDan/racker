@@ -726,7 +726,6 @@ function HierarchyCreateDialog({
     } else if (type === "RACK") {
       payload.rowId = parentId;
       payload.totalU = Number(formNumber1 || 42);
-      payload.maxPowerWatts = Number(formNumber2 || 12000);
       payload.posX = Number(formPosX || 4);
       payload.posY = Number(formPosY || 3);
     }
@@ -799,25 +798,17 @@ function HierarchyCreateDialog({
         </div>
 
         {type === "RACK" && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 mb-1 font-medium">Height (Total U)</label>
-              <input
-                type="number"
-                value={formNumber1}
-                onChange={(event) => setFormNumber1(event.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 mb-1 font-medium">Max Power (Watts)</label>
-              <input
-                type="number"
-                value={formNumber2}
-                onChange={(event) => setFormNumber2(event.target.value)}
-                className={inputClass}
-              />
-            </div>
+          <div>
+            <label className="block text-slate-300 mb-1 font-medium">Height (Total U)</label>
+            <input
+              type="number"
+              value={formNumber1}
+              onChange={(event) => setFormNumber1(event.target.value)}
+              className={inputClass}
+            />
+            <p className="mt-1 text-[11px] text-slate-500">
+              Power capacity is determined automatically by the PDUs installed in the rack.
+            </p>
           </div>
         )}
 
@@ -1035,17 +1026,11 @@ function HierarchyEditDialog({
         )}
         {form.type === "RACK" && (
           <>
-            <Field
-              label="Height (total U)"
-              value={form.totalU}
-              onChange={(value) => setField("totalU", value)}
-              number
-            />
             <div className="grid grid-cols-2 gap-3">
               <Field
-                label="Max power (watts)"
-                value={form.maxPowerWatts}
-                onChange={(value) => setField("maxPowerWatts", value)}
+                label="Height (total U)"
+                value={form.totalU}
+                onChange={(value) => setField("totalU", value)}
                 number
               />
               <Field
@@ -1055,6 +1040,9 @@ function HierarchyEditDialog({
                 number
               />
             </div>
+            <p className="text-[11px] text-slate-500">
+              Power capacity is calculated automatically from the PDUs installed in this rack.
+            </p>
           </>
         )}
         <ModalFooter onCancel={onClose} submitLabel="Save" saving={saving} />

@@ -175,10 +175,13 @@ interface RackMetric {
   currentPowerWatts: number;
   maxPowerWatts: number;
   powerUtilizationPct: number;
+  pduCount: number;
   freeOutlets: number;
   totalOutlets: number;
   feedAWatts: number;
   feedBWatts: number;
+  feedACapacityWatts: number;
+  feedBCapacityWatts: number;
   spofDeviceCount: number;
   largestContiguousFreeU: number;
 }
@@ -527,7 +530,11 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           </h1>
           <p className="mt-1 text-xs text-slate-400">
             {rack.row.room.name} · {rack.row.name} · {rack.totalU}U ·{" "}
-            {rack.maxPowerWatts.toLocaleString()} W envelope
+            {metric && metric.maxPowerWatts > 0
+              ? `${metric.maxPowerWatts.toLocaleString()} W PDU capacity (${rack.pdus.length} ${
+                  rack.pdus.length === 1 ? "PDU" : "PDUs"
+                })`
+              : "0 W PDU capacity (no PDUs installed)"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -586,7 +593,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
           />
           <Meter
             label="Rack power"
-            value={`${metric.currentPowerWatts.toLocaleString()} W`}
+            value={`${metric.currentPowerWatts.toLocaleString()} / ${metric.maxPowerWatts.toLocaleString()} W`}
             hint={`A ${metric.feedAWatts} W · B ${metric.feedBWatts} W`}
             pct={metric.powerUtilizationPct}
             tone="amber"

@@ -65,6 +65,8 @@ export interface RackCapacitySummary {
   freeOutlets: number;
   feedAWatts: number;
   feedBWatts: number;
+  feedACapacityWatts: number;
+  feedBCapacityWatts: number;
 }
 
 export interface PanelCapacitySummary {
@@ -534,15 +536,30 @@ export async function getFullInfrastructureSnapshot() {
     let freeOutlets = 0;
     let feedAWatts = 0;
     let feedBWatts = 0;
+    let feedACapacityWatts = 0;
+    let feedBCapacityWatts = 0;
     for (const pdu of rack.pdus) {
       const pSum = pduSummariesMap.get(pdu.id);
       if (pSum) {
         totalOutlets += pSum.totalOutlets;
         freeOutlets += pSum.freeOutlets;
-        if (pSum.feedSide === "A") feedAWatts += pSum.loadWatts;
-        else feedBWatts += pSum.loadWatts;
+        if (pSum.feedSide === "A") {
+          feedAWatts += pSum.loadWatts;
+          if (pdu.status !== "OFFLINE") feedACapacityWatts += pSum.maxWatts;
+        } else {
+          feedBWatts += pSum.loadWatts;
+          if (pdu.status !== "OFFLINE") feedBCapacityWatts += pSum.maxWatts;
+        }
       }
     }
+
+    const pduCapacityWatts = Math.round(feedACapacityWatts + feedBCapacityWatts);
+    const powerUtilizationPct =
+      pduCapacityWatts > 0
+        ? Math.round((currentPowerWatts / pduCapacityWatts) * 1000) / 10
+        : currentPowerWatts > 0
+        ? 100
+        : 0;
 
     rackSummaries.push({
       id: rack.id,
@@ -558,12 +575,10 @@ export async function getFullInfrastructureSnapshot() {
       freeU: Math.max(0, rack.totalU - usedU),
       uUtilizationPct: Math.round((usedU / rack.totalU) * 1000) / 10,
       largestContiguousFreeU,
-      maxPowerWatts: rack.maxPowerWatts,
+      maxPowerWatts: pduCapacityWatts,
       currentPowerWatts: Math.round(currentPowerWatts),
       peakPowerWatts: Math.round(peakPowerWatts),
-      powerUtilizationPct:
-        Math.round((currentPowerWatts / Math.max(1, rack.maxPowerWatts)) * 1000) /
-        10,
+      powerUtilizationPct,
       maxWeightKg: rack.maxWeightKg,
       currentWeightKg: Math.round(currentWeightKg * 10) / 10,
       deviceCount: rack.devices.length,
@@ -574,6 +589,8 @@ export async function getFullInfrastructureSnapshot() {
       freeOutlets,
       feedAWatts: Math.round(feedAWatts),
       feedBWatts: Math.round(feedBWatts),
+      feedACapacityWatts: Math.round(feedACapacityWatts),
+      feedBCapacityWatts: Math.round(feedBCapacityWatts),
     });
   }
 
@@ -752,12 +769,12 @@ export async function getFullInfrastructureSnapshot() {
         entityId: r.id,
       });
     }
-    if (r.powerUtilizationPct >= 80) {
+    if (r.powerUtilizationPct >= 80 && r.maxPowerWatts > 0) {
       alerts.push({
         severity: "CRITICAL",
         category: "POWER",
         title: `High Power Density on ${r.code} (${r.powerUtilizationPct}%)`,
-        description: `Drawing ${r.currentPowerWatts}W of ${r.maxPowerWatts}W rated rack power envelope.`,
+        description: `Drawing ${r.currentPowerWatts}W of ${r.maxPowerWatts}W installed PDU capacity.`,
         entityId: r.id,
       });
     }

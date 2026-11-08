@@ -357,13 +357,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      await syncRackPowerCapacity(rackId);
+
       await prisma.auditLog.create({
         data: {
           userId: auth.user.id,
           action: "ADD_RACK_PDU",
           entityType: "RACK_PDU",
           entityId: pdu.id,
-          details: `Added PDU ${pdu.name} (${outletNumber - 1} outlets) to rack`,
+          details: `Added PDU ${pdu.name} (${outletNumber - 1} outlets, ${maxWatts}W) to rack`,
         },
       });
 
@@ -371,7 +373,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "DELETE_RACK_PDU") {
+      const existing = await prisma.rackPdu.findUnique({
+        where: { id: body.pduId },
+      });
       await prisma.rackPdu.delete({ where: { id: body.pduId } });
+      if (existing) {
+        await syncRackPowerCapacity(existing.rackId);
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -424,4 +432,16 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+async function syncRackPowerCapacity(rackId: string) {
+  const pdus = await prisma.rackPdu.findMany({
+    where: { rackId, status: { not: "OFFLINE" } },
+    select: { maxWatts: true },
+  });
+  const total = Math.round(pdus.reduce((sum, p) => sum + (p.maxWatts || 0), 0));
+  await prisma.rack.update({
+    where: { id: rackId },
+    data: { maxPowerWatts: total },
+  });
 }
