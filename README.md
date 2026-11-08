@@ -228,4 +228,4 @@ docker compose --profile e2e up --build --abort-on-container-exit e2e
 
 ## License
 
-Private / unpublished. Add a license here if you distribute the project.
+MIT
