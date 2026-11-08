@@ -174,6 +174,7 @@ export async function getFullInfrastructureSnapshot() {
     devices,
     networkCables,
     templates,
+    pduTemplates,
   ] = await Promise.all([
     prisma.site.findMany({
       include: {
@@ -369,6 +370,9 @@ export async function getFullInfrastructureSnapshot() {
     }),
     prisma.deviceTemplate.findMany({
       orderBy: [{ deviceType: "asc" }, { manufacturer: "asc" }],
+    }),
+    prisma.pduTemplate.findMany({
+      orderBy: [{ name: "asc" }, { manufacturer: "asc" }, { model: "asc" }],
     }),
   ]);
 
@@ -838,6 +842,7 @@ export async function getFullInfrastructureSnapshot() {
     devices,
     networkCables,
     templates,
+    pduTemplates,
     capacity,
   };
 }

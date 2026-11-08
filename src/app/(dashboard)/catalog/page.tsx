@@ -2,15 +2,25 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Library, Plus } from "lucide-react";
+import { Library, PlugZap, Plus, Trash2 } from "lucide-react";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import {
   APPLIANCE_TYPES,
+  PDU_INPUT_PLUG_TYPES,
+  PDU_MOUNTING_TYPES,
+  PDU_PHASE_MODES,
+  PDU_SOCKET_TYPES,
   PLUG_TYPES,
   PORT_TYPES,
+  type OutletBankSpec,
+  type PduSocketType,
   applianceLabel,
   btuFromWatts,
+  describeOutletSpecs,
+  formatOutletSpecs,
   heatBtu,
+  parseOutletSpecs,
+  pduMaxWatts,
 } from "@/lib/appliance-catalog";
 import {
   AlertBanner,
@@ -22,6 +32,7 @@ import {
   SortHeader,
   btnPrimary,
   btnSecondary,
+  compactInputClass,
   inputClass,
   tableClasses,
   useTableSort,
@@ -45,6 +56,21 @@ interface Appliance {
   installedCount: number;
 }
 
+interface PduCatalogItem {
+  id: string;
+  name: string;
+  manufacturer: string;
+  model: string;
+  mounting: string;
+  uHeight: number;
+  phaseMode: string;
+  maxAmps: number;
+  voltageV: number;
+  inputPlugType: string;
+  outletSpecs: string;
+  installedCount: number;
+}
+
 interface Draft {
   name: string;
   manufacturer: string;
@@ -59,6 +85,19 @@ interface Draft {
   psuPlugType: string;
   portCount: string;
   portType: string;
+}
+
+interface PduDraft {
+  name: string;
+  manufacturer: string;
+  model: string;
+  mounting: string;
+  uHeight: string;
+  phaseMode: string;
+  maxAmps: string;
+  voltageV: string;
+  inputPlugType: string;
+  banks: OutletBankSpec[];
 }
 
 const EMPTY: Draft = {
@@ -77,13 +116,33 @@ const EMPTY: Draft = {
   portType: "SFP28_25G",
 };
 
+const EMPTY_PDU: PduDraft = {
+  name: "",
+  manufacturer: "APC",
+  model: "AP8853 Zero-U 32A",
+  mounting: "ZERO_U_LEFT",
+  uHeight: "0",
+  phaseMode: "SINGLE_PHASE",
+  maxAmps: "32",
+  voltageV: "230",
+  inputPlugType: "IEC_60309_32A_1P",
+  banks: [
+    { socketType: "C13", count: 12 },
+    { socketType: "C19", count: 4 },
+  ],
+};
+
 export default function CatalogPage() {
   const { role } = useInfrastructure();
   const admin = role === "ADMIN";
   const [appliances, setAppliances] = useState<Appliance[]>([]);
+  const [pduTemplates, setPduTemplates] = useState<PduCatalogItem[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [pduDraft, setPduDraft] = useState<PduDraft>(EMPTY_PDU);
+  const [editingPduId, setEditingPduId] = useState<string | null>(null);
+  const [pduModalOpen, setPduModalOpen] = useState(false);
   const [btuTouched, setBtuTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -105,6 +164,21 @@ export default function CatalogPage() {
     "name"
   );
 
+  const pduSort = useTableSort(
+    pduTemplates,
+    {
+      name: (item) => applianceLabel(item),
+      mounting: (item) => item.mounting,
+      phaseMode: (item) => item.phaseMode,
+      rating: (item) => pduMaxWatts(item.phaseMode, item.maxAmps, item.voltageV),
+      inputPlug: (item) => item.inputPlugType,
+      outlets: (item) =>
+        parseOutletSpecs(item.outletSpecs).reduce((sum, b) => sum + b.count, 0),
+      installedCount: (item) => item.installedCount,
+    },
+    "name"
+  );
+
   async function load() {
     const res = await fetch("/api/catalog");
     if (res.status === 401) {
@@ -117,6 +191,7 @@ export default function CatalogPage() {
       return;
     }
     setAppliances(data.appliances || []);
+    setPduTemplates(data.pduTemplates || []);
   }
 
   useEffect(() => {
@@ -171,6 +246,37 @@ export default function CatalogPage() {
     setDraft(EMPTY);
   }
 
+  function beginCreatePdu() {
+    setEditingPduId(null);
+    setPduDraft(EMPTY_PDU);
+    setError(null);
+    setPduModalOpen(true);
+  }
+
+  function beginEditPdu(item: PduCatalogItem) {
+    setEditingPduId(item.id);
+    setPduDraft({
+      name: item.name || applianceLabel(item),
+      manufacturer: item.manufacturer,
+      model: item.model,
+      mounting: item.mounting,
+      uHeight: String(item.uHeight || (item.mounting === "RACKMOUNT" ? 1 : 0)),
+      phaseMode: item.phaseMode,
+      maxAmps: String(item.maxAmps),
+      voltageV: String(item.voltageV),
+      inputPlugType: item.inputPlugType,
+      banks: parseOutletSpecs(item.outletSpecs),
+    });
+    setError(null);
+    setPduModalOpen(true);
+  }
+
+  function closePduModal() {
+    setPduModalOpen(false);
+    setEditingPduId(null);
+    setPduDraft(EMPTY_PDU);
+  }
+
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -192,6 +298,40 @@ export default function CatalogPage() {
       return;
     }
     closeModal();
+    await load();
+  }
+
+  async function savePdu(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    const outletSpecs = formatOutletSpecs(pduDraft.banks);
+    const res = await fetch("/api/catalog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: editingPduId ? "UPDATE_PDU" : "CREATE_PDU",
+        id: editingPduId,
+        name: pduDraft.name,
+        manufacturer: pduDraft.manufacturer,
+        model: pduDraft.model,
+        mounting: pduDraft.mounting,
+        uHeight: pduDraft.mounting === "RACKMOUNT" ? pduDraft.uHeight : "0",
+        phaseMode: pduDraft.phaseMode,
+        maxAmps: pduDraft.maxAmps,
+        voltageV: pduDraft.voltageV,
+        inputPlugType: pduDraft.inputPlugType,
+        outletSpecs,
+      }),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) {
+      setError(data.error || "Could not save the PDU template");
+      return;
+    }
+    closePduModal();
     await load();
   }
 
@@ -220,7 +360,32 @@ export default function CatalogPage() {
     await load();
   }
 
-  async function importCsv(file: File | undefined) {
+  async function removePdu(item: PduCatalogItem) {
+    const label = applianceLabel(item);
+    const installed =
+      item.installedCount === 0
+        ? ""
+        : item.installedCount === 1
+          ? " The installed rack PDU keeps its current outlets."
+          : ` ${item.installedCount} installed rack PDUs keep their current outlets.`;
+    if (!window.confirm(`Remove ${label} from the PDU catalog?${installed}`)) return;
+    setError(null);
+    setNotice(null);
+    const res = await fetch("/api/catalog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "DELETE_PDU", id: item.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Could not remove the PDU template");
+      return;
+    }
+    if (editingPduId === item.id) closePduModal();
+    await load();
+  }
+
+  async function importCsv(file: File | undefined, kind: "appliance" | "pdu") {
     if (!file) return;
     setSaving(true);
     setError(null);
@@ -229,7 +394,10 @@ export default function CatalogPage() {
     const res = await fetch("/api/catalog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "IMPORT_CSV", csv }),
+      body: JSON.stringify({
+        action: kind === "pdu" ? "IMPORT_PDU_CSV" : "IMPORT_CSV",
+        csv,
+      }),
     });
     const data = await res.json();
     setSaving(false);
@@ -238,8 +406,40 @@ export default function CatalogPage() {
       return;
     }
     const written = Number(data.written || 0);
-    setNotice(written === 1 ? "Imported 1 appliance." : `Imported ${written} appliances.`);
+    if (kind === "pdu") {
+      setNotice(
+        written === 1 ? "Imported 1 PDU template." : `Imported ${written} PDU templates.`
+      );
+    } else {
+      setNotice(
+        written === 1 ? "Imported 1 appliance." : `Imported ${written} appliances.`
+      );
+    }
     await load();
+  }
+
+  function updateBank(index: number, patch: Partial<OutletBankSpec>) {
+    setPduDraft((current) => ({
+      ...current,
+      banks: current.banks.map((b, i) => (i === index ? { ...b, ...patch } : b)),
+    }));
+  }
+
+  function addBank() {
+    const used = new Set(pduDraft.banks.map((b) => b.socketType));
+    const nextType =
+      PDU_SOCKET_TYPES.find((t) => !used.has(t)) || PDU_SOCKET_TYPES[0];
+    setPduDraft((current) => ({
+      ...current,
+      banks: [...current.banks, { socketType: nextType, count: 4 }],
+    }));
+  }
+
+  function removeBank(index: number) {
+    setPduDraft((current) => ({
+      ...current,
+      banks: current.banks.filter((_, i) => i !== index),
+    }));
   }
 
   return (
@@ -247,15 +447,14 @@ export default function CatalogPage() {
       <PageHeader
         kicker="Appliance Library & Specs"
         icon={<Library className="h-3.5 w-3.5" />}
-        title="Appliance catalog"
+        title="Appliance & PDU catalog"
         subtitle={
           <>
-            Predefined gear for the rack install list. Choosing one fills in the name, type, height,
-            power, PSUs, plug, and ports.{" "}
+            Predefined servers, network gear, and custom rack PDUs with configurable socket banks.{" "}
             <Link href="/racks" className="text-cyan-400 hover:underline">
               Open a rack
             </Link>{" "}
-            and use Install device to apply one.
+            and use Install device or Add PDU to apply a template.
           </>
         }
         actions={
@@ -273,11 +472,15 @@ export default function CatalogPage() {
                     className="hidden"
                     disabled={saving}
                     onChange={(event) => {
-                      void importCsv(event.target.files?.[0]);
+                      void importCsv(event.target.files?.[0], "appliance");
                       event.target.value = "";
                     }}
                   />
                 </label>
+                <button type="button" onClick={beginCreatePdu} className={btnSecondary}>
+                  <PlugZap className="h-3.5 w-3.5 text-amber-300" />
+                  New PDU template
+                </button>
                 <button type="button" onClick={beginCreate} className={btnPrimary}>
                   <Plus className="h-3.5 w-3.5" />
                   New appliance
@@ -290,15 +493,19 @@ export default function CatalogPage() {
 
       {admin && (
         <p className="-mt-3 text-[11px] text-slate-500">
-          A blank id adds an appliance. An existing id updates that row. Leave BTU/h blank to fill it from watts.
+          A blank id adds an entry. An existing id updates that row. Leave BTU/h blank to fill it from watts.
         </p>
       )}
 
-      {!modalOpen && <AlertBanner error={error} notice={notice} />}
+      {!modalOpen && !pduModalOpen && <AlertBanner error={error} notice={notice} />}
 
       {appliances.length === 0 ? (
-        <SectionCard padded>
-          <p className="text-sm text-slate-400">The catalog is empty.</p>
+        <SectionCard
+          title="Catalog templates"
+          subtitle="Servers, switches, routers, firewalls, storage, patch panels, and rack UPS"
+          padded
+        >
+          <p className="text-sm text-slate-400">The appliance catalog is empty.</p>
         </SectionCard>
       ) : (
         <SectionCard
@@ -371,6 +578,115 @@ export default function CatalogPage() {
           </div>
         </SectionCard>
       )}
+
+      <SectionCard
+        title="Rack PDU templates"
+        subtitle="Custom zero-U and rackmount PDUs with varying outlet socket banks (C13, C19, UK BS1363, Schuko, NEMA)"
+        actions={
+          <>
+            <a href="/api/catalog?format=csv&kind=pdu" className={btnSecondary}>
+              Export PDU CSV
+            </a>
+            {admin && (
+              <>
+                <label className={`cursor-pointer ${btnSecondary}`}>
+                  Import PDU CSV
+                  <input
+                    type="file"
+                    accept="text/csv,.csv"
+                    className="hidden"
+                    disabled={saving}
+                    onChange={(event) => {
+                      void importCsv(event.target.files?.[0], "pdu");
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+                <button type="button" onClick={beginCreatePdu} className={btnPrimary}>
+                  <Plus className="h-3.5 w-3.5" />
+                  New PDU template
+                </button>
+              </>
+            )}
+          </>
+        }
+      >
+        {pduTemplates.length === 0 ? (
+          <div className="p-4 text-sm text-slate-400">
+            No custom PDU templates yet. Click New PDU template to define socket banks for C13, C19, UK BS1363, Schuko, or NEMA outlets.
+          </div>
+        ) : (
+          <div className={tableClasses.wrapper}>
+            <table className={tableClasses.table}>
+              <thead className={tableClasses.thead}>
+                <tr>
+                  <SortHeader label="Name" column="name" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <SortHeader label="Mounting" column="mounting" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <SortHeader label="Phase" column="phaseMode" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <SortHeader label="Rating" column="rating" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <SortHeader label="Input whip" column="inputPlug" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <SortHeader label="Socket banks" column="outlets" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <SortHeader label="Installed" column="installedCount" sortKey={pduSort.sortKey} sortDir={pduSort.sortDir} onSort={pduSort.toggleSort} />
+                  <th className={tableClasses.thRight}> </th>
+                </tr>
+              </thead>
+              <tbody className={tableClasses.tbody}>
+                {pduSort.sorted.map((item) => {
+                  const watts = pduMaxWatts(item.phaseMode, item.maxAmps, item.voltageV);
+                  return (
+                    <tr key={item.id} className={tableClasses.tr}>
+                      <td className={tableClasses.td}>
+                        <div className="font-semibold text-white">{applianceLabel(item)}</div>
+                        <div className="text-slate-500">
+                          {item.manufacturer} {item.model}
+                        </div>
+                      </td>
+                      <td className={tableClasses.td}>
+                        {item.mounting}
+                        {item.mounting === "RACKMOUNT" ? ` (${item.uHeight}U)` : ""}
+                      </td>
+                      <td className={tableClasses.td}>{item.phaseMode}</td>
+                      <td className={`${tableClasses.td} font-mono`}>
+                        {item.maxAmps}A · {item.voltageV}V
+                        <div className="text-[10px] text-slate-500">
+                          {(watts / 1000).toFixed(1)} kW max
+                        </div>
+                      </td>
+                      <td className={`${tableClasses.td} font-mono`}>{item.inputPlugType}</td>
+                      <td className={tableClasses.td}>
+                        <span className="font-medium text-amber-200">
+                          {describeOutletSpecs(item.outletSpecs)}
+                        </span>
+                      </td>
+                      <td className={tableClasses.td}>{item.installedCount}</td>
+                      <td className={tableClasses.tdRight}>
+                        {admin && (
+                          <div className="flex justify-end gap-3">
+                            <button
+                              type="button"
+                              onClick={() => beginEditPdu(item)}
+                              className="text-cyan-400 hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removePdu(item)}
+                              className="text-rose-300 hover:underline"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
       {admin && modalOpen && (
         <Modal
@@ -522,6 +838,223 @@ export default function CatalogPage() {
               submitLabel={editingId ? "Save appliance" : "Add appliance"}
               saving={saving}
               hint="BTU/h follows watts until you edit it. 1 W is about 3.412 BTU/h."
+            />
+          </form>
+        </Modal>
+      )}
+
+      {admin && pduModalOpen && (
+        <Modal
+          title={editingPduId ? "Edit PDU template" : "New PDU template"}
+          onClose={closePduModal}
+          wide
+        >
+          <AlertBanner error={error} />
+          <form onSubmit={savePdu} className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="PDU name">
+                <input
+                  required
+                  value={pduDraft.name}
+                  onChange={(e) => setPduDraft({ ...pduDraft, name: e.target.value })}
+                  placeholder="Zero-U 32A Mixed C13/C19"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Manufacturer">
+                <input
+                  required
+                  value={pduDraft.manufacturer}
+                  onChange={(e) => setPduDraft({ ...pduDraft, manufacturer: e.target.value })}
+                  placeholder="APC / Raritan / ServerTech"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Model">
+                <input
+                  required
+                  value={pduDraft.model}
+                  onChange={(e) => setPduDraft({ ...pduDraft, model: e.target.value })}
+                  placeholder="AP8853"
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Mounting">
+                <select
+                  value={pduDraft.mounting}
+                  onChange={(e) =>
+                    setPduDraft({
+                      ...pduDraft,
+                      mounting: e.target.value,
+                      uHeight:
+                        e.target.value === "RACKMOUNT"
+                          ? pduDraft.uHeight === "0"
+                            ? "1"
+                            : pduDraft.uHeight
+                          : "0",
+                    })
+                  }
+                  className={inputClass}
+                >
+                  {PDU_MOUNTING_TYPES.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {pduDraft.mounting === "RACKMOUNT" && (
+                <Field label="Height (U)">
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={4}
+                    value={pduDraft.uHeight}
+                    onChange={(e) => setPduDraft({ ...pduDraft, uHeight: e.target.value })}
+                    className={inputClass}
+                  />
+                </Field>
+              )}
+              <Field label="Phase mode">
+                <select
+                  value={pduDraft.phaseMode}
+                  onChange={(e) => {
+                    const phaseMode = e.target.value;
+                    setPduDraft({
+                      ...pduDraft,
+                      phaseMode,
+                      voltageV: phaseMode === "THREE_PHASE" ? "400" : "230",
+                      inputPlugType:
+                        phaseMode === "THREE_PHASE"
+                          ? "IEC_60309_32A_3P"
+                          : "IEC_60309_32A_1P",
+                    });
+                  }}
+                  className={inputClass}
+                >
+                  {PDU_PHASE_MODES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Max amps">
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={125}
+                  value={pduDraft.maxAmps}
+                  onChange={(e) => setPduDraft({ ...pduDraft, maxAmps: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Voltage (V)">
+                <input
+                  required
+                  type="number"
+                  min={100}
+                  max={480}
+                  value={pduDraft.voltageV}
+                  onChange={(e) => setPduDraft({ ...pduDraft, voltageV: e.target.value })}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Input whip plug">
+                <select
+                  value={pduDraft.inputPlugType}
+                  onChange={(e) =>
+                    setPduDraft({ ...pduDraft, inputPlugType: e.target.value })
+                  }
+                  className={inputClass}
+                >
+                  {PDU_INPUT_PLUG_TYPES.map((plug) => (
+                    <option key={plug} value={plug}>
+                      {plug}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-white">
+                    Socket banks ({pduDraft.banks.reduce((sum, b) => sum + Number(b.count || 0), 0)} total outlets)
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Combine different socket types (e.g. 12× C13 + 4× C19, or UK BS1363 / Schuko / NEMA banks).
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={addBank}
+                  className={btnSecondary}
+                >
+                  <Plus className="h-3 w-3" /> Add socket bank
+                </button>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                {pduDraft.banks.map((bank, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      aria-label={`Socket type ${index + 1}`}
+                      value={bank.socketType}
+                      onChange={(e) =>
+                        updateBank(index, {
+                          socketType: e.target.value as PduSocketType,
+                        })
+                      }
+                      className={`${compactInputClass} flex-1`}
+                    >
+                      {PDU_SOCKET_TYPES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label={`Socket count ${index + 1}`}
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={bank.count}
+                      onChange={(e) =>
+                        updateBank(index, { count: Number(e.target.value) })
+                      }
+                      className={`${compactInputClass} w-24`}
+                    />
+                    <span className="text-xs text-slate-400">sockets</span>
+                    {pduDraft.banks.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeBank(index)}
+                        className="rounded p-1 text-slate-400 hover:text-rose-300"
+                        title="Remove bank"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <ModalFooter
+              onCancel={closePduModal}
+              submitLabel={editingPduId ? "Save PDU template" : "Add PDU template"}
+              saving={saving}
+              hint={`Max power: ${(
+                pduMaxWatts(
+                  pduDraft.phaseMode,
+                  Number(pduDraft.maxAmps || 0),
+                  Number(pduDraft.voltageV || 0)
+                ) / 1000
+              ).toFixed(1)} kW`}
             />
           </form>
         </Modal>

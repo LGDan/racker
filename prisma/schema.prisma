@@ -251,6 +251,8 @@ model RackPdu {
   id            String        @id @default(cuid())
   rackId        String
   rack          Rack          @relation(fields: [rackId], references: [id], onDelete: Cascade)
+  templateId    String?
+  template      PduTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
   circuitId     String?
   circuit       PowerCircuit? @relation(fields: [circuitId], references: [id], onDelete: SetNull)
   name          String
@@ -267,6 +269,22 @@ model RackPdu {
   status        String        @default("ONLINE") // ONLINE | OFFLINE
   outlets       PduOutlet[]
   createdAt     DateTime      @default(now())
+}
+
+model PduTemplate {
+  id            String    @id @default(cuid())
+  name          String    @default("")
+  manufacturer  String
+  model         String
+  mounting      String    @default("ZERO_U_LEFT") // ZERO_U_LEFT | ZERO_U_RIGHT | RACKMOUNT
+  uHeight       Int       @default(0)
+  phaseMode     String    @default("SINGLE_PHASE") // SINGLE_PHASE | THREE_PHASE
+  maxAmps       Float     @default(32)
+  voltageV      Int       @default(230)
+  inputPlugType String    @default("IEC_60309_32A_1P")
+  outletSpecs   String    @default("C13:12,C19:4")
+  pdus          RackPdu[]
+  createdAt     DateTime  @default(now())
 }
 
 model PduOutlet {

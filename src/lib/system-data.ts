@@ -220,6 +220,7 @@ export const CSV_ENTITIES: CsvEntity[] = [
     fields: [
       id,
       { name: "rackId", type: "string", required: true },
+      { name: "templateId", type: "string", optional: true },
       { name: "circuitId", type: "string", optional: true },
       { name: "name", type: "string", required: true },
       { name: "model", type: "string" },
@@ -233,6 +234,24 @@ export const CSV_ENTITIES: CsvEntity[] = [
       { name: "maxWatts", type: "float" },
       { name: "inputPlugType", type: "string" },
       { name: "status", type: "string" },
+      createdAt,
+    ],
+  },
+  {
+    key: "pduTemplates",
+    label: "PDU templates",
+    fields: [
+      id,
+      { name: "name", type: "string", optional: true },
+      { name: "manufacturer", type: "string", required: true },
+      { name: "model", type: "string", required: true },
+      { name: "mounting", type: "string" },
+      { name: "uHeight", type: "int" },
+      { name: "phaseMode", type: "string" },
+      { name: "maxAmps", type: "float" },
+      { name: "voltageV", type: "int" },
+      { name: "inputPlugType", type: "string" },
+      { name: "outletSpecs", type: "string" },
       createdAt,
     ],
   },
@@ -374,6 +393,7 @@ function delegate(db: Db | PrismaClient, key: string): {
     powerSources: "powerSource",
     powerPanels: "powerPanel",
     powerCircuits: "powerCircuit",
+    pduTemplates: "pduTemplate",
     rackPdus: "rackPdu",
     pduOutlets: "pduOutlet",
     deviceTemplates: "deviceTemplate",
@@ -446,6 +466,7 @@ export async function wipeInfrastructure(db: Db | PrismaClient = prisma) {
   await db.locationMedia.deleteMany();
   await db.building.deleteMany();
   await db.site.deleteMany();
+  await db.pduTemplate.deleteMany();
   await db.deviceTemplate.deleteMany();
 }
 

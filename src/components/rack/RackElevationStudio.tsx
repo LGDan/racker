@@ -6,8 +6,29 @@ import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import { LocationCrumbs } from "@/components/location/LocationFrame";
 import { crumbsFor, findChain } from "@/components/location/model";
 import { deviceKind, suggestedCode } from "@/lib/suggested-code";
-import { applianceLabel, heatBtu } from "@/lib/appliance-catalog";
-import { AlertBanner, Modal, btnPrimary, btnSecondary, inputClass } from "@/components/ui/primitives";
+import {
+  PDU_INPUT_PLUG_TYPES,
+  PDU_PHASE_MODES,
+  PDU_SOCKET_TYPES,
+  PLUG_TYPES,
+  type OutletBankSpec,
+  type PduSocketType,
+  applianceLabel,
+  describeOutletSpecs,
+  formatOutletSpecs,
+  heatBtu,
+  parseOutletSpecs,
+  pduMaxWatts,
+  plugFitsSocket,
+} from "@/lib/appliance-catalog";
+import {
+  AlertBanner,
+  Modal,
+  btnPrimary,
+  btnSecondary,
+  compactInputClass,
+  inputClass,
+} from "@/components/ui/primitives";
 import {
   Cable,
   CheckCircle2,
@@ -132,6 +153,20 @@ interface Template {
   portType: string;
 }
 
+interface PduTemplate {
+  id: string;
+  name?: string;
+  manufacturer: string;
+  model: string;
+  mounting: string;
+  uHeight: number;
+  phaseMode: string;
+  maxAmps: number;
+  voltageV: number;
+  inputPlugType: string;
+  outletSpecs: string;
+}
+
 interface RackMetric {
   usedU: number;
   freeU: number;
@@ -176,13 +211,7 @@ const TYPE_COLOR: Record<string, string> = {
 };
 
 function plugFits(plug: string, socket: string): { ok: boolean; warning?: string } {
-  if (plug === "C20" && socket === "C13") {
-    return { ok: false, warning: "A C20 plug cannot mate with a C13 outlet. Use a C19." };
-  }
-  if (plug === "C14" && socket === "C19") {
-    return { ok: true, warning: "C14 fits a C19, but a C13 is the usual mate." };
-  }
-  return { ok: true };
+  return plugFitsSocket(plug, socket);
 }
 
 function portCable(port: NetPort) {
@@ -194,6 +223,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
   const [rack, setRack] = useState<Rack | null>(null);
   const [allRacks, setAllRacks] = useState<{ id: string; code: string; name: string }[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [pduTemplates, setPduTemplates] = useState<PduTemplate[]>([]);
   const [circuits, setCircuits] = useState<FloorSocket[]>([]);
   const [metric, setMetric] = useState<RackMetric | null>(null);
   const [pduMetrics, setPduMetrics] = useState<Record<string, PduMetric>>({});
@@ -211,11 +241,34 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showPdu, setShowPdu] = useState(false);
-  const [pduDraft, setPduDraft] = useState({
+  const [pduTemplateId, setPduTemplateId] = useState("");
+  const [pduDraft, setPduDraft] = useState<{
+    name: string;
+    model: string;
+    feedSide: string;
+    mounting: string;
+    uHeight: number;
+    phaseMode: string;
+    maxAmps: number;
+    voltageV: number;
+    inputPlugType: string;
+    circuitId: string;
+    banks: OutletBankSpec[];
+  }>({
     name: "",
+    model: "APC AP8853 Zero-U 32A",
     feedSide: "A",
     mounting: "ZERO_U_LEFT",
+    uHeight: 0,
+    phaseMode: "SINGLE_PHASE",
+    maxAmps: 32,
+    voltageV: 230,
+    inputPlugType: "IEC_60309_32A_1P",
     circuitId: "",
+    banks: [
+      { socketType: "C13", count: 12 },
+      { socketType: "C19", count: 4 },
+    ],
   });
   const [templateId, setTemplateId] = useState("");
   const [hostname, setHostname] = useState("");
@@ -254,6 +307,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
       (data.racks as Rack[]).map((r) => ({ id: r.id, code: r.code, name: r.name }))
     );
     setTemplates(data.templates || []);
+    setPduTemplates(data.pduTemplates || []);
     setCircuits(data.powerCircuits || []);
     const m = (data.capacity?.racks || []).find((r: { id: string }) => r.id === rackId);
     setMetric(m || null);
@@ -315,6 +369,29 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
     }
     await load();
     return true;
+  }
+
+  function applyPduTemplate(id: string) {
+    setPduTemplateId(id);
+    const t = pduTemplates.find((x) => x.id === id);
+    if (!t) return;
+    setPduDraft((current) => ({
+      ...current,
+      name: current.name || `${applianceLabel(t)} (${current.feedSide})`.slice(0, 48),
+      model: `${t.manufacturer} ${t.model}`.trim(),
+      mounting:
+        t.mounting === "RACKMOUNT"
+          ? "RACKMOUNT"
+          : current.feedSide === "B"
+          ? "ZERO_U_RIGHT"
+          : t.mounting,
+      uHeight: t.uHeight || 0,
+      phaseMode: t.phaseMode,
+      maxAmps: t.maxAmps,
+      voltageV: t.voltageV,
+      inputPlugType: t.inputPlugType,
+      banks: parseOutletSpecs(t.outletSpecs),
+    }));
   }
 
   function applyTemplate(id: string) {
@@ -427,6 +504,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
   );
 
   const chosenTemplate = templates.find((item) => item.id === templateId);
+  const chosenPduTemplate = pduTemplates.find((item) => item.id === pduTemplateId);
   const rackChain = findChain(sites, "rack", rack.id);
   const rackCrumbs = rackChain
     ? [
@@ -646,8 +724,11 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
                 onChange={(e) => setDraft({ ...draft, psuPlugType: e.target.value })}
                 className={inputClass}
               >
-                <option>C14</option>
-                <option>C20</option>
+                {PLUG_TYPES.map((plug) => (
+                  <option key={plug} value={plug}>
+                    {plug}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Ports">
@@ -679,37 +760,75 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
       )}
 
       {showPdu && (
-        <Modal title="Add Rack PDU" onClose={() => setShowPdu(false)}>
+        <Modal title="Add Rack PDU" onClose={() => setShowPdu(false)} wide>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               const ok = await operate({
                 action: "ADD_RACK_PDU",
                 rackId: rack.id,
+                templateId: pduTemplateId || null,
                 name: pduDraft.name,
+                model: pduDraft.model,
                 feedSide: pduDraft.feedSide,
                 mounting: pduDraft.mounting,
+                uHeight: pduDraft.uHeight,
                 circuitId: pduDraft.circuitId || null,
-                phaseMode: "SINGLE_PHASE",
-                maxAmps: 32,
-                voltageV: 230,
+                phaseMode: pduDraft.phaseMode,
+                maxAmps: pduDraft.maxAmps,
+                voltageV: pduDraft.voltageV,
+                inputPlugType: pduDraft.inputPlugType,
+                outletSpecs: formatOutletSpecs(pduDraft.banks),
               });
               if (ok) {
                 setShowPdu(false);
                 setMessage(`Added ${pduDraft.name}.`);
               }
             }}
-            className="space-y-3"
+            className="space-y-4"
           >
-            <Field label="PDU name">
-              <input
-                required
-                value={pduDraft.name}
-                onChange={(e) => setPduDraft({ ...pduDraft, name: e.target.value })}
-                className={inputClass}
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium text-slate-300">
+                <span className="flex items-center justify-between gap-2">
+                  Catalog PDU template
+                  {role === "ADMIN" && (
+                    <Link href="/catalog" className="text-cyan-400 hover:underline">
+                      Edit catalog
+                    </Link>
+                  )}
+                </span>
+                <select
+                  className={inputClass}
+                  value={pduTemplateId}
+                  onChange={(e) => applyPduTemplate(e.target.value)}
+                >
+                  <option value="">Custom PDU</option>
+                  {pduTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {applianceLabel(t)}
+                    </option>
+                  ))}
+                </select>
+                {chosenPduTemplate && (
+                  <span className="mt-1 block font-normal text-[11px] text-slate-500">
+                    {chosenPduTemplate.phaseMode} · {chosenPduTemplate.maxAmps}A {chosenPduTemplate.voltageV}V ·{" "}
+                    {describeOutletSpecs(chosenPduTemplate.outletSpecs)}
+                  </span>
+                )}
+              </label>
+
+              <Field label="PDU name">
+                <input
+                  required
+                  value={pduDraft.name}
+                  onChange={(e) => setPduDraft({ ...pduDraft, name: e.target.value })}
+                  placeholder="PDU-A1"
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Feed">
                 <select
                   value={pduDraft.feedSide}
@@ -717,7 +836,12 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
                     setPduDraft({
                       ...pduDraft,
                       feedSide: e.target.value,
-                      mounting: e.target.value === "B" ? "ZERO_U_RIGHT" : "ZERO_U_LEFT",
+                      mounting:
+                        pduDraft.mounting === "RACKMOUNT"
+                          ? "RACKMOUNT"
+                          : e.target.value === "B"
+                          ? "ZERO_U_RIGHT"
+                          : "ZERO_U_LEFT",
                     })
                   }
                   className={inputClass}
@@ -737,35 +861,194 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
                   <option value="RACKMOUNT">RACKMOUNT</option>
                 </select>
               </Field>
+              <Field label="Floor socket">
+                <select
+                  value={pduDraft.circuitId}
+                  onChange={(e) => setPduDraft({ ...pduDraft, circuitId: e.target.value })}
+                  className={inputClass}
+                >
+                  <option value="">None yet</option>
+                  {roomCircuits.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.floorSocketLabel} · {c.phaseAllocation} · {c.ratedAmps}A
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
-            <Field label="Floor socket">
-              <select
-                value={pduDraft.circuitId}
-                onChange={(e) => setPduDraft({ ...pduDraft, circuitId: e.target.value })}
-                className={inputClass}
-              >
-                <option value="">None yet</option>
-                {roomCircuits.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.floorSocketLabel} · {c.phaseAllocation} · {c.ratedAmps}A
-                  </option>
+
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Field label="Phase mode">
+                <select
+                  value={pduDraft.phaseMode}
+                  onChange={(e) => {
+                    const phaseMode = e.target.value;
+                    setPduDraft({
+                      ...pduDraft,
+                      phaseMode,
+                      voltageV: phaseMode === "THREE_PHASE" ? 400 : 230,
+                      inputPlugType:
+                        phaseMode === "THREE_PHASE"
+                          ? "IEC_60309_32A_3P"
+                          : "IEC_60309_32A_1P",
+                    });
+                  }}
+                  className={inputClass}
+                >
+                  {PDU_PHASE_MODES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Max amps">
+                <input
+                  type="number"
+                  min={1}
+                  max={125}
+                  value={pduDraft.maxAmps}
+                  onChange={(e) =>
+                    setPduDraft({ ...pduDraft, maxAmps: Number(e.target.value) })
+                  }
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Voltage (V)">
+                <input
+                  type="number"
+                  min={100}
+                  max={480}
+                  value={pduDraft.voltageV}
+                  onChange={(e) =>
+                    setPduDraft({ ...pduDraft, voltageV: Number(e.target.value) })
+                  }
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Input whip plug">
+                <select
+                  value={pduDraft.inputPlugType}
+                  onChange={(e) =>
+                    setPduDraft({ ...pduDraft, inputPlugType: e.target.value })
+                  }
+                  className={inputClass}
+                >
+                  {PDU_INPUT_PLUG_TYPES.map((plug) => (
+                    <option key={plug} value={plug}>
+                      {plug}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-white">
+                    Socket banks ({pduDraft.banks.reduce((sum, b) => sum + Number(b.count || 0), 0)} total outlets)
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Customize outlet socket types and counts for this PDU.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const used = new Set(pduDraft.banks.map((b) => b.socketType));
+                    const nextType =
+                      PDU_SOCKET_TYPES.find((t) => !used.has(t)) || PDU_SOCKET_TYPES[0];
+                    setPduDraft({
+                      ...pduDraft,
+                      banks: [...pduDraft.banks, { socketType: nextType, count: 4 }],
+                    });
+                  }}
+                  className={btnSecondary}
+                >
+                  <Plus className="h-3 w-3" /> Add socket bank
+                </button>
+              </div>
+              <div className="space-y-2 pt-1">
+                {pduDraft.banks.map((bank, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <select
+                      aria-label={`PDU socket type ${index + 1}`}
+                      value={bank.socketType}
+                      onChange={(e) =>
+                        setPduDraft({
+                          ...pduDraft,
+                          banks: pduDraft.banks.map((b, i) =>
+                            i === index
+                              ? { ...b, socketType: e.target.value as PduSocketType }
+                              : b
+                          ),
+                        })
+                      }
+                      className={`${compactInputClass} flex-1`}
+                    >
+                      {PDU_SOCKET_TYPES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label={`PDU socket count ${index + 1}`}
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={bank.count}
+                      onChange={(e) =>
+                        setPduDraft({
+                          ...pduDraft,
+                          banks: pduDraft.banks.map((b, i) =>
+                            i === index ? { ...b, count: Number(e.target.value) } : b
+                          ),
+                        })
+                      }
+                      className={`${compactInputClass} w-24`}
+                    />
+                    <span className="text-xs text-slate-400">sockets</span>
+                    {pduDraft.banks.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPduDraft({
+                            ...pduDraft,
+                            banks: pduDraft.banks.filter((_, i) => i !== index),
+                          })
+                        }
+                        className="rounded p-1 text-slate-400 hover:text-rose-300"
+                        title="Remove bank"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </select>
-            </Field>
-            <div className="flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowPdu(false)}
-                className={btnSecondary}
-              >
-                Cancel
-              </button>
-              <button
-                disabled={busy}
-                className={btnPrimary}
-              >
-                {busy ? "Adding…" : "Add PDU"}
-              </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3">
+              <span className="text-[11px] text-slate-500">
+                Max rating: {(pduMaxWatts(pduDraft.phaseMode, pduDraft.maxAmps, pduDraft.voltageV) / 1000).toFixed(1)} kW
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPdu(false)}
+                  className={btnSecondary}
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={busy}
+                  className={btnPrimary}
+                >
+                  {busy ? "Adding…" : "Add PDU"}
+                </button>
+              </div>
             </div>
           </form>
         </Modal>
@@ -930,12 +1213,30 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
             {rack.pdus.map((pdu) => {
               const m = pduMetrics[pdu.id];
               return (
-                <label key={pdu.id} className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-[11px] text-slate-400">
-                  <span className={pdu.feedSide === "A" ? "text-blue-300" : "text-amber-300"}>
-                    {pdu.name}
-                  </span>
-                  {m ? ` · ${m.loadWatts} W · ${m.loadAmps} A · ${m.freeOutlets} sockets free` : ""}
+                <div key={pdu.id} className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      <span className={pdu.feedSide === "A" ? "font-semibold text-blue-300" : "font-semibold text-amber-300"}>
+                        {pdu.name}
+                      </span>
+                      {m ? ` · ${m.loadWatts} W · ${m.loadAmps} A · ${m.freeOutlets}/${m.totalOutlets} free` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        if (!window.confirm(`Remove PDU ${pdu.name} from the rack?`)) return;
+                        const ok = await operate({ action: "DELETE_RACK_PDU", pduId: pdu.id });
+                        if (ok) setMessage(`Removed ${pdu.name}.`);
+                      }}
+                      className="text-slate-500 hover:text-rose-300"
+                      title={`Remove ${pdu.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <select
+                    aria-label={`Floor socket for ${pdu.name}`}
                     className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200"
                     value={pdu.circuitId || ""}
                     onChange={async (e) => {
@@ -954,7 +1255,7 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
               );
             })}
           </div>

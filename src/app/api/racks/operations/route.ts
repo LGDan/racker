@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-guards";
+import { parseOutletSpecs, pduMaxWatts, socketMaxAmps } from "@/lib/appliance-catalog";
 
 // Standard AND Admin users are allowed to edit what's inside racks:
 // - Add / move / edit / remove RackDevices
@@ -286,59 +287,85 @@ export async function POST(req: NextRequest) {
     if (action === "ADD_RACK_PDU") {
       const {
         rackId,
+        templateId,
         circuitId,
         name,
+        model,
         mounting,
+        uHeight,
         feedSide,
         phaseMode,
         maxAmps,
         voltageV,
+        inputPlugType,
+        outletSpecs,
       } = body;
 
+      const resolvedPhase = phaseMode || "SINGLE_PHASE";
       const amps = Number(maxAmps || 32);
-      const volts = Number(voltageV || (phaseMode === "THREE_PHASE" ? 400 : 230));
-      const maxWatts =
-        phaseMode === "THREE_PHASE"
-          ? Math.round(amps * 230 * 3)
-          : Math.round(amps * volts);
+      const volts = Number(
+        voltageV || (resolvedPhase === "THREE_PHASE" ? 400 : 230)
+      );
+      const maxWatts = pduMaxWatts(resolvedPhase, amps, volts);
+      const banks = parseOutletSpecs(outletSpecs);
 
       const pdu = await prisma.rackPdu.create({
         data: {
           rackId,
+          templateId: templateId || null,
           circuitId: circuitId || null,
           name,
           model:
-            phaseMode === "THREE_PHASE"
+            model ||
+            (resolvedPhase === "THREE_PHASE"
               ? "Raritan PX3 3-Phase Zero-U"
-              : "APC AP8853 Zero-U 32A",
+              : "APC AP8853 Zero-U 32A"),
           mounting: mounting || "ZERO_U_LEFT",
+          uHeight: mounting === "RACKMOUNT" ? Number(uHeight || 1) : 0,
           feedSide: feedSide || "A",
-          phaseMode: phaseMode || "SINGLE_PHASE",
+          phaseMode: resolvedPhase,
           maxAmps: amps,
           voltageV: volts,
           maxWatts,
           inputPlugType:
-            phaseMode === "THREE_PHASE"
+            inputPlugType ||
+            (resolvedPhase === "THREE_PHASE"
               ? "IEC_60309_32A_3P"
-              : "IEC_60309_32A_1P",
+              : "IEC_60309_32A_1P"),
         },
       });
 
       const phases = ["L1", "L2", "L3"];
-      for (let i = 1; i <= 16; i++) {
-        const socketType = i >= 13 ? "C19" : "C13";
-        await prisma.pduOutlet.create({
-          data: {
-            pduId: pdu.id,
-            outletNumber: i,
-            label: `Outlet #${i} (${socketType})`,
-            bankPhase:
-              phaseMode === "THREE_PHASE" ? phases[(i - 1) % 3] : "L1",
-            socketType,
-            maxAmps: socketType === "C19" ? 16 : 10,
-          },
-        });
+      let outletNumber = 1;
+      for (const bank of banks) {
+        for (let c = 0; c < bank.count; c++) {
+          const socketType = bank.socketType;
+          await prisma.pduOutlet.create({
+            data: {
+              pduId: pdu.id,
+              outletNumber,
+              label: `Outlet #${outletNumber} (${socketType})`,
+              bankPhase:
+                resolvedPhase === "THREE_PHASE"
+                  ? phases[(outletNumber - 1) % 3]
+                  : "L1",
+              socketType,
+              maxAmps: socketMaxAmps(socketType),
+            },
+          });
+          outletNumber++;
+        }
       }
+
+      await prisma.auditLog.create({
+        data: {
+          userId: auth.user.id,
+          action: "ADD_RACK_PDU",
+          entityType: "RACK_PDU",
+          entityId: pdu.id,
+          details: `Added PDU ${pdu.name} (${outletNumber - 1} outlets) to rack`,
+        },
+      });
 
       return NextResponse.json({ item: pdu });
     }
