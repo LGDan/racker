@@ -122,10 +122,12 @@ export interface SiteSupply {
 
 export interface FloorCircuit {
   id: string;
+  panelId: string;
   roomId: string;
   rackId: string | null;
   name: string;
   floorSocketLabel: string;
+  breakerNumber: number;
   phaseAllocation: string;
   ratedAmps: number;
   voltageV: number;
@@ -133,6 +135,34 @@ export interface FloorCircuit {
   posX: number;
   posY: number;
   elevation?: string;
+}
+
+export interface TreePanel {
+  id: string;
+  roomId: string;
+  upstreamSourceId: string;
+  name: string;
+  feedSide: string;
+  maxAmpsPerPhase: number;
+  voltageLToN: number;
+  voltageLToL: number;
+  totalBreakerSlots: number;
+  status: string;
+}
+
+export interface PanelMetric {
+  id: string;
+  maxAmpsPerPhase: number;
+  maxPhaseLoadPct: number;
+  phaseLoad: {
+    ampsL1: number;
+    ampsL2: number;
+    ampsL3: number;
+    wattsL1: number;
+    wattsL2: number;
+    wattsL3: number;
+    imbalancePct: number;
+  };
 }
 
 const EMPTY_SITES: TreeSite[] = [];
@@ -160,9 +190,14 @@ interface SupplySummary {
 
 interface Snapshot {
   sites: TreeSite[];
+  powerPanels?: TreePanel[];
   powerCircuits: FloorCircuit[];
   powerSources?: RawSupply[];
-  capacity?: { racks?: RackMetric[]; powerSources?: SupplySummary[] };
+  capacity?: {
+    racks?: RackMetric[];
+    panels?: PanelMetric[];
+    powerSources?: SupplySummary[];
+  };
   currentUser?: { role?: "ADMIN" | "STANDARD" };
 }
 
@@ -192,8 +227,10 @@ interface InfrastructureValue {
   loading: boolean;
   role: "ADMIN" | "STANDARD";
   sites: TreeSite[];
+  panels: TreePanel[];
   circuits: FloorCircuit[];
   rackMetrics: Record<string, RackMetric>;
+  panelMetrics: Record<string, PanelMetric>;
   powerSources: SiteSupply[];
   expanded: ReadonlySet<string>;
   toggle: (id: string) => void;
@@ -439,10 +476,45 @@ export function InfrastructureProvider({
   const floorId = pathname.match(/^\/floors\/([^/]+)/)?.[1] || "";
   const rowId = pathname.match(/^\/rows\/([^/]+)/)?.[1] || "";
   const rackId = pathname.match(/^\/racks\/([^/]+)/)?.[1] || "";
-  const roomId = pathname.startsWith("/hierarchy") ? searchParams.get("room") || "" : "";
+  const panelQuery = pathname.startsWith("/power-cooling")
+    ? searchParams.get("panel") || ""
+    : "";
+  const phaseQuery = pathname.startsWith("/power-cooling")
+    ? searchParams.get("phase") || ""
+    : "";
+  const socketQuery = pathname.startsWith("/power-cooling")
+    ? searchParams.get("socket") || ""
+    : "";
+  const roomFromPower = useMemo(() => {
+    if (socketQuery) {
+      const found = (snapshot?.powerCircuits || []).find((c) => c.id === socketQuery);
+      if (found) return found.roomId;
+    }
+    if (panelQuery) {
+      const found = (snapshot?.powerPanels || []).find((p) => p.id === panelQuery);
+      if (found) return found.roomId;
+    }
+    return "";
+  }, [snapshot?.powerCircuits, snapshot?.powerPanels, panelQuery, socketQuery]);
+  const roomId = pathname.startsWith("/hierarchy")
+    ? searchParams.get("room") || ""
+    : roomFromPower;
 
   useEffect(() => {
     const ids = ancestorIds(sites, { siteId, buildingId, floorId, roomId, rowId, rackId });
+    if (roomFromPower) {
+      ids.push(roomFromPower);
+    }
+    if (socketQuery) {
+      const found = (snapshot?.powerCircuits || []).find((c) => c.id === socketQuery);
+      if (found) {
+        ids.push(found.panelId);
+        ids.push(`${found.panelId}:${found.phaseAllocation}`);
+      }
+    } else if (panelQuery) {
+      ids.push(panelQuery);
+      if (phaseQuery) ids.push(`${panelQuery}:${phaseQuery}`);
+    }
     if (!ids.length) return;
     setExpanded((prev) => {
       let changed = false;
@@ -455,7 +527,20 @@ export function InfrastructureProvider({
       }
       return changed ? next : prev;
     });
-  }, [sites, siteId, buildingId, floorId, roomId, rowId, rackId]);
+  }, [
+    sites,
+    siteId,
+    buildingId,
+    floorId,
+    roomId,
+    rowId,
+    rackId,
+    roomFromPower,
+    panelQuery,
+    phaseQuery,
+    socketQuery,
+    snapshot?.powerCircuits,
+  ]);
 
   const expand = useCallback((id: string) => {
     const parents = parentLookup(sitesRef.current);
@@ -500,6 +585,12 @@ export function InfrastructureProvider({
     return map;
   }, [snapshot]);
 
+  const panelMetrics = useMemo(() => {
+    const map: Record<string, PanelMetric> = {};
+    for (const panel of snapshot?.capacity?.panels || []) map[panel.id] = panel;
+    return map;
+  }, [snapshot]);
+
   const powerSources = useMemo(() => {
     const loads = new Map<string, SupplySummary>();
     for (const summary of snapshot?.capacity?.powerSources || []) loads.set(summary.id, summary);
@@ -524,8 +615,10 @@ export function InfrastructureProvider({
       loading,
       role: resolvedRole,
       sites,
+      panels: snapshot?.powerPanels || [],
       circuits: snapshot?.powerCircuits || [],
       rackMetrics,
+      panelMetrics,
       powerSources,
       expanded,
       toggle,
@@ -538,8 +631,10 @@ export function InfrastructureProvider({
       loading,
       resolvedRole,
       sites,
+      snapshot?.powerPanels,
       snapshot?.powerCircuits,
       rackMetrics,
+      panelMetrics,
       powerSources,
       expanded,
       toggle,

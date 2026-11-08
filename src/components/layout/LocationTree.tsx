@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  Activity,
   Building2,
   ChevronRight,
   Columns3,
@@ -11,47 +12,97 @@ import {
   Grid2x2,
   Layers,
   PanelLeftClose,
+  PlugZap,
   Search,
   Server,
+  Zap,
 } from "lucide-react";
 import {
   useInfrastructure,
+  type FloorCircuit,
   type TreeBuilding,
   type TreeFloor,
+  type TreePanel,
   type TreeRoom,
   type TreeRow,
   type TreeSite,
 } from "./infrastructure-context";
 
+const PHASES = ["L1", "L2", "L3", "THREE_PHASE"] as const;
+
 function includes(query: string, ...parts: Array<string | number | undefined>) {
   return parts.some((part) => String(part ?? "").toLowerCase().includes(query));
 }
 
-function filterSites(sites: TreeSite[], query: string): TreeSite[] {
+function filterSites(
+  sites: TreeSite[],
+  query: string,
+  panelsByRoom: Map<string, TreePanel[]>,
+  circuitsByPanel: Map<string, FloorCircuit[]>
+): TreeSite[] {
   if (!query) return sites;
   return sites.flatMap((site) => {
     if (includes(query, site.name, site.code, site.city)) return [site];
-    const buildings = site.buildings.flatMap((building) => filterBuilding(building, query));
+    const buildings = site.buildings.flatMap((building) =>
+      filterBuilding(building, query, panelsByRoom, circuitsByPanel)
+    );
     return buildings.length ? [{ ...site, buildings }] : [];
   });
 }
 
-function filterBuilding(building: TreeBuilding, query: string): TreeBuilding[] {
+function filterBuilding(
+  building: TreeBuilding,
+  query: string,
+  panelsByRoom: Map<string, TreePanel[]>,
+  circuitsByPanel: Map<string, FloorCircuit[]>
+): TreeBuilding[] {
   if (includes(query, building.name, building.code)) return [building];
-  const floors = building.floors.flatMap((floor) => filterFloor(floor, query));
+  const floors = building.floors.flatMap((floor) =>
+    filterFloor(floor, query, panelsByRoom, circuitsByPanel)
+  );
   return floors.length ? [{ ...building, floors }] : [];
 }
 
-function filterFloor(floor: TreeFloor, query: string): TreeFloor[] {
+function filterFloor(
+  floor: TreeFloor,
+  query: string,
+  panelsByRoom: Map<string, TreePanel[]>,
+  circuitsByPanel: Map<string, FloorCircuit[]>
+): TreeFloor[] {
   if (includes(query, floor.name, floor.levelNumber)) return [floor];
-  const rooms = floor.rooms.flatMap((room) => filterRoom(room, query));
+  const rooms = floor.rooms.flatMap((room) =>
+    filterRoom(room, query, panelsByRoom, circuitsByPanel)
+  );
   return rooms.length ? [{ ...floor, rooms }] : [];
 }
 
-function filterRoom(room: TreeRoom, query: string): TreeRoom[] {
+function filterRoom(
+  room: TreeRoom,
+  query: string,
+  panelsByRoom: Map<string, TreePanel[]>,
+  circuitsByPanel: Map<string, FloorCircuit[]>
+): TreeRoom[] {
   if (includes(query, room.name, room.code)) return [room];
   const rows = room.rows.flatMap((row) => filterRow(row, query));
-  return rows.length ? [{ ...room, rows }] : [];
+  const roomPanels = panelsByRoom.get(room.id) || [];
+  const powerMatched = roomPanels.some((panel) => {
+    if (includes(query, panel.name, `feed ${panel.feedSide}`)) return true;
+    const panelCircuits = circuitsByPanel.get(panel.id) || [];
+    return panelCircuits.some((c) =>
+      includes(
+        query,
+        c.floorSocketLabel,
+        c.name,
+        c.phaseAllocation,
+        c.socketType,
+        `#${c.breakerNumber}`
+      )
+    );
+  });
+  if (rows.length || powerMatched) {
+    return [{ ...room, rows: rows.length ? rows : room.rows }];
+  }
+  return [];
 }
 
 function filterRow(row: TreeRow, query: string): TreeRow[] {
@@ -71,7 +122,10 @@ export function LocationTree({
     loading,
     role,
     sites,
+    panels,
+    circuits,
     rackMetrics,
+    panelMetrics,
     expanded,
     toggle,
     openAdd,
@@ -81,13 +135,60 @@ export function LocationTree({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const roomId = searchParams.get("room") || "";
+  const activePanelId = pathname.startsWith("/power-cooling")
+    ? searchParams.get("panel") || ""
+    : "";
+  const activePhase = pathname.startsWith("/power-cooling")
+    ? searchParams.get("phase") || ""
+    : "";
+  const activeSocketId = pathname.startsWith("/power-cooling")
+    ? searchParams.get("socket") || ""
+    : "";
   const rackId = pathname.match(/^\/racks\/([^/]+)/)?.[1] || "";
   const siteId = pathname.match(/^\/sites\/([^/]+)/)?.[1] || "";
   const buildingId = pathname.match(/^\/buildings\/([^/]+)/)?.[1] || "";
   const floorId = pathname.match(/^\/floors\/([^/]+)/)?.[1] || "";
   const rowId = pathname.match(/^\/rows\/([^/]+)/)?.[1] || "";
+
+  const panelsByRoom = useMemo(() => {
+    const map = new Map<string, TreePanel[]>();
+    for (const p of panels) {
+      const list = map.get(p.roomId) || [];
+      list.push(p);
+      map.set(p.roomId, list);
+    }
+    return map;
+  }, [panels]);
+
+  const circuitsByPanel = useMemo(() => {
+    const map = new Map<string, FloorCircuit[]>();
+    for (const c of circuits) {
+      const list = map.get(c.panelId) || [];
+      list.push(c);
+      map.set(c.panelId, list);
+    }
+    return map;
+  }, [circuits]);
+
+  const rackCodeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of sites) {
+      for (const b of s.buildings) {
+        for (const f of b.floors) {
+          for (const rm of f.rooms) {
+            for (const rw of rm.rows) {
+              for (const rk of rw.racks) map.set(rk.id, rk.code);
+            }
+          }
+        }
+      }
+    }
+    return map;
+  }, [sites]);
+
   const searching = query.trim().length > 0;
-  const visible = filterSites(sites, query.trim().toLowerCase());
+  const normalizedQuery = query.trim().toLowerCase();
+  const visible = filterSites(sites, normalizedQuery, panelsByRoom, circuitsByPanel);
   const admin = role === "ADMIN";
 
   function isOpen(id: string) {
@@ -253,6 +354,7 @@ export function LocationTree({
                                       (count, row) => count + row.racks.length,
                                       0
                                     );
+                                    const roomPanels = panelsByRoom.get(room.id) || [];
                                     return (
                                       <li key={room.id}>
                                         <div className="flex items-center gap-1">
@@ -346,6 +448,165 @@ export function LocationTree({
                                                 )}
                                               </li>
                                             ))}
+
+                                            {roomPanels.map((panel) => {
+                                              const panelCircuits =
+                                                circuitsByPanel.get(panel.id) || [];
+                                              const pm = panelMetrics[panel.id];
+                                              const panelSelected =
+                                                activePanelId === panel.id &&
+                                                !activePhase &&
+                                                !activeSocketId;
+                                              return (
+                                                <li key={panel.id}>
+                                                  <div className="flex items-center gap-1 px-1 py-0.5">
+                                                    <BranchToggle
+                                                      open={isOpen(panel.id)}
+                                                      onClick={() => toggle(panel.id)}
+                                                    />
+                                                    <Zap
+                                                      className={`h-3.5 w-3.5 shrink-0 ${
+                                                        panel.feedSide === "A"
+                                                          ? "text-blue-400"
+                                                          : "text-amber-400"
+                                                      }`}
+                                                      aria-hidden="true"
+                                                    />
+                                                    <Link
+                                                      href={`/power-cooling?panel=${encodeURIComponent(panel.id)}`}
+                                                      className={`min-w-0 truncate rounded-md px-1 py-0.5 ${
+                                                        panelSelected
+                                                          ? "bg-cyan-500/15 text-white"
+                                                          : "text-slate-300 hover:bg-slate-800"
+                                                      }`}
+                                                    >
+                                                      {panel.name}
+                                                    </Link>
+                                                    <span
+                                                      className={`ml-auto shrink-0 rounded px-1 py-0.5 text-[9px] font-bold ${
+                                                        panel.feedSide === "A"
+                                                          ? "bg-blue-500/15 text-blue-300"
+                                                          : "bg-amber-500/15 text-amber-300"
+                                                      }`}
+                                                    >
+                                                      {panel.feedSide}
+                                                    </span>
+                                                  </div>
+                                                  {isOpen(panel.id) && (
+                                                    <ul className="ml-4 space-y-0.5 border-l border-slate-800/80 pl-1 py-0.5">
+                                                      {PHASES.map((phase) => {
+                                                        const phaseCircuits = panelCircuits.filter(
+                                                          (c) => c.phaseAllocation === phase
+                                                        );
+                                                        if (
+                                                          phase === "THREE_PHASE" &&
+                                                          phaseCircuits.length === 0
+                                                        ) {
+                                                          return null;
+                                                        }
+                                                        const phaseNodeId = `${panel.id}:${phase}`;
+                                                        const phaseAmps =
+                                                          phase === "L1"
+                                                            ? pm?.phaseLoad.ampsL1 ?? 0
+                                                            : phase === "L2"
+                                                            ? pm?.phaseLoad.ampsL2 ?? 0
+                                                            : phase === "L3"
+                                                            ? pm?.phaseLoad.ampsL3 ?? 0
+                                                            : null;
+                                                        const phaseSelected =
+                                                          activePanelId === panel.id &&
+                                                          activePhase === phase;
+                                                        const phaseLabel =
+                                                          phase === "THREE_PHASE"
+                                                            ? "3-Phase"
+                                                            : `Phase ${phase}`;
+                                                        return (
+                                                          <li key={phaseNodeId}>
+                                                            <div className="flex items-center gap-1 px-1 py-0.5">
+                                                              <BranchToggle
+                                                                open={isOpen(phaseNodeId)}
+                                                                onClick={() => toggle(phaseNodeId)}
+                                                              />
+                                                              <Activity
+                                                                className="h-3 w-3 shrink-0 text-cyan-400"
+                                                                aria-hidden="true"
+                                                              />
+                                                              <Link
+                                                                href={`/power-cooling?panel=${encodeURIComponent(panel.id)}&phase=${encodeURIComponent(phase)}`}
+                                                                className={`min-w-0 truncate rounded px-1 py-0.5 text-[11px] ${
+                                                                  phaseSelected
+                                                                    ? "bg-cyan-500/15 text-white"
+                                                                    : "text-slate-300 hover:bg-slate-800"
+                                                                }`}
+                                                              >
+                                                                {phaseLabel}
+                                                              </Link>
+                                                              <span className="ml-auto shrink-0 font-mono text-[10px] text-slate-500">
+                                                                {phaseAmps !== null
+                                                                  ? `${phaseAmps}A`
+                                                                  : `${phaseCircuits.length}`}
+                                                              </span>
+                                                            </div>
+                                                            {isOpen(phaseNodeId) && (
+                                                              <ul className="ml-5 space-y-0.5 py-0.5">
+                                                                {phaseCircuits.length === 0 ? (
+                                                                  <li className="px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                                    No floor sockets
+                                                                  </li>
+                                                                ) : (
+                                                                  phaseCircuits.map((circuit) => {
+                                                                    const socketSelected =
+                                                                      activeSocketId === circuit.id;
+                                                                    const rackCode = circuit.rackId
+                                                                      ? rackCodeById.get(
+                                                                          circuit.rackId
+                                                                        )
+                                                                      : null;
+                                                                    return (
+                                                                      <li key={circuit.id}>
+                                                                        <Link
+                                                                          href={`/power-cooling?socket=${encodeURIComponent(circuit.id)}`}
+                                                                          className={`flex items-center gap-1.5 rounded px-1.5 py-1 font-mono text-[11px] ${
+                                                                            socketSelected
+                                                                              ? "bg-cyan-500/15 text-cyan-100"
+                                                                              : "text-slate-300 hover:bg-slate-800"
+                                                                          }`}
+                                                                        >
+                                                                          <PlugZap
+                                                                            className={`h-3 w-3 shrink-0 ${
+                                                                              socketSelected
+                                                                                ? "text-cyan-400"
+                                                                                : "text-amber-400"
+                                                                            }`}
+                                                                            aria-hidden="true"
+                                                                          />
+                                                                          <span className="truncate">
+                                                                            {circuit.floorSocketLabel}
+                                                                          </span>
+                                                                          <span className="truncate font-sans text-[10px] text-slate-500">
+                                                                            #{circuit.breakerNumber}{" "}
+                                                                            · {circuit.ratedAmps}A
+                                                                          </span>
+                                                                          {rackCode && (
+                                                                            <span className="ml-auto shrink-0 font-mono text-[10px] text-cyan-400">
+                                                                              {rackCode}
+                                                                            </span>
+                                                                          )}
+                                                                        </Link>
+                                                                      </li>
+                                                                    );
+                                                                  })
+                                                                )}
+                                                              </ul>
+                                                            )}
+                                                          </li>
+                                                        );
+                                                      })}
+                                                    </ul>
+                                                  )}
+                                                </li>
+                                              );
+                                            })}
                                           </ul>
                                         )}
                                       </li>

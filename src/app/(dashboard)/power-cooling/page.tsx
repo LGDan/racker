@@ -2,7 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, ThermometerSnowflake, Zap } from "lucide-react";
+import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import {
   AlertBanner,
   Field,
@@ -158,6 +160,11 @@ const SOCKET_TYPES = [
 ] as const;
 
 export default function PowerCoolingPage() {
+  const searchParams = useSearchParams();
+  const { refresh: refreshTree } = useInfrastructure();
+  const selectedPanelId = searchParams.get("panel") || "";
+  const selectedPhase = searchParams.get("phase") || "";
+  const selectedSocketId = searchParams.get("socket") || "";
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -243,8 +250,32 @@ export default function PowerCoolingPage() {
     "name"
   );
 
+  const filteredPanels = useMemo(() => {
+    const all = snap?.powerPanels ?? [];
+    if (selectedSocketId) {
+      const sock = (snap?.powerCircuits ?? []).find((c) => c.id === selectedSocketId);
+      if (sock) return all.filter((p) => p.id === sock.panelId);
+    }
+    if (selectedPanelId) return all.filter((p) => p.id === selectedPanelId);
+    return all;
+  }, [snap?.powerPanels, snap?.powerCircuits, selectedPanelId, selectedSocketId]);
+
+  const filteredCircuits = useMemo(() => {
+    let list = snap?.powerCircuits ?? [];
+    if (selectedSocketId) {
+      return list.filter((c) => c.id === selectedSocketId);
+    }
+    if (selectedPanelId) {
+      list = list.filter((c) => c.panelId === selectedPanelId);
+    }
+    if (selectedPhase) {
+      list = list.filter((c) => c.phaseAllocation === selectedPhase);
+    }
+    return list;
+  }, [snap?.powerCircuits, selectedPanelId, selectedPhase, selectedSocketId]);
+
   const panelsSort = useTableSort(
-    snap?.powerPanels ?? [],
+    filteredPanels,
     {
       name: (p) => p.name,
       room: (p) => p.room.name,
@@ -258,7 +289,7 @@ export default function PowerCoolingPage() {
   );
 
   const socketsSort = useTableSort(
-    snap?.powerCircuits ?? [],
+    filteredCircuits,
     {
       socket: (c) => c.floorSocketLabel,
       name: (c) => c.name,
@@ -301,7 +332,7 @@ export default function PowerCoolingPage() {
         return false;
       }
       setNotice(successMsg);
-      await load();
+      await Promise.all([load(), refreshTree()]);
       return true;
     } finally {
       setSaving(false);
@@ -469,6 +500,28 @@ export default function PowerCoolingPage() {
       />
 
       {!modal && <AlertBanner error={error} notice={notice} />}
+
+      {(selectedPanelId || selectedPhase || selectedSocketId) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-xs text-cyan-200">
+          <span>
+            Showing tree selection:{" "}
+            <strong className="text-white">
+              {selectedSocketId
+                ? snap.powerCircuits.find((c) => c.id === selectedSocketId)?.floorSocketLabel ||
+                  "Socket"
+                : [
+                    snap.powerPanels.find((p) => p.id === selectedPanelId)?.name,
+                    selectedPhase ? `Phase ${selectedPhase}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+            </strong>
+          </span>
+          <Link href="/power-cooling" className="font-semibold text-cyan-300 hover:underline">
+            Show all panels & sockets
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3">
