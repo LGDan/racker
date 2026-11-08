@@ -439,6 +439,7 @@ export async function wipeInfrastructure(db: Db | PrismaClient = prisma) {
   await db.row.deleteMany();
   await db.room.deleteMany();
   await db.floor.deleteMany();
+  await db.locationMedia.deleteMany();
   await db.building.deleteMany();
   await db.site.deleteMany();
   await db.deviceTemplate.deleteMany();

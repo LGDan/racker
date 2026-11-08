@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import { LocationFrame, Meter } from "./LocationFrame";
+import { LocationMediaGallery } from "./LocationMedia";
 import {
   containmentLabel,
   crumbsFor,
@@ -79,6 +80,8 @@ export function SiteView({ siteId }: { siteId: string }) {
           <p className="mt-1 text-sm font-semibold text-white">{Number(site.pueTarget).toFixed(2)}</p>
         </figure>
       </div>
+
+      <LocationMediaGallery ownerType="SITE" ownerId={site.id} admin={role === "ADMIN"} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-white">Buildings</h2>
@@ -176,6 +179,7 @@ export function BuildingView({ buildingId }: { buildingId: string }) {
       rollup={rollupRooms(rooms, rackMetrics)}
       onEdit={role === "ADMIN" ? () => openEdit("BUILDING", building.id) : undefined}
     >
+      <LocationMediaGallery ownerType="BUILDING" ownerId={building.id} admin={role === "ADMIN"} />
       {floors.length === 0 ? (
         <p className="text-sm text-slate-400">This building has no floors yet.</p>
       ) : (

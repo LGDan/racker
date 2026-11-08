@@ -42,6 +42,7 @@ model Site {
   pueTarget         Float         @default(1.28)
   buildings         Building[]
   powerSources      PowerSource[]
+  media             LocationMedia[]
   createdAt         DateTime      @default(now())
 }
 
@@ -52,7 +53,25 @@ model Building {
   name      String
   code      String
   floors    Floor[]
+  media     LocationMedia[]
   createdAt DateTime @default(now())
+}
+
+model LocationMedia {
+  id         String    @id @default(cuid())
+  siteId     String?
+  site       Site?     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  buildingId String?
+  building   Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  kind       String // PHOTO | MAP | FLOORPLAN
+  fileName   String
+  mimeType   String
+  bytes      Bytes
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([siteId, kind])
+  @@index([buildingId, kind])
 }
 
 model Floor {
