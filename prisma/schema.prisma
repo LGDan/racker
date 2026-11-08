@@ -79,6 +79,7 @@ model Floor {
   buildingId  String
   building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   name        String
+  code        String?
   levelNumber Int
   rooms       Room[]
   createdAt   DateTime @default(now())
@@ -153,6 +154,7 @@ model Row {
   roomId           String
   room             Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   name             String
+  code             String?
   orientation      String   @default("HORIZONTAL") // HORIZONTAL | VERTICAL
   aisleContainment String   @default("COLD_AISLE") // NONE | HOT_AISLE | COLD_AISLE
   gridX            Int      @default(1)

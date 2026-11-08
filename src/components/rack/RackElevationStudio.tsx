@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useInfrastructure } from "@/components/layout/infrastructure-context";
 import { LocationCrumbs } from "@/components/location/LocationFrame";
 import { crumbsFor, findChain } from "@/components/location/model";
+import { deviceKind, suggestedCode } from "@/lib/suggested-code";
 import {
   Cable,
   CheckCircle2,
@@ -213,6 +214,8 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
     circuitId: "",
   });
   const [templateId, setTemplateId] = useState("");
+  const [hostname, setHostname] = useState("");
+  const [hostnameTouched, setHostnameTouched] = useState(false);
   const [draft, setDraft] = useState({
     name: "",
     deviceType: "SERVER",
@@ -270,8 +273,18 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
     setSelectedDeviceId(null);
     setSelectedPsuId(null);
     setSelectedPortId(null);
+    setHostnameTouched(false);
     load();
   }, [load]);
+
+  const suggestedHostname = useMemo(
+    () => (rack ? suggestedCode(sites, deviceKind(draft.deviceType), rack.id, draft.name) : ""),
+    [sites, rack, draft.deviceType, draft.name]
+  );
+
+  useEffect(() => {
+    if (!hostnameTouched) setHostname(suggestedHostname);
+  }, [hostnameTouched, suggestedHostname]);
 
   const selected = rack?.devices.find((d) => d.id === selectedDeviceId) || null;
   const selectedPsu = selected?.psus.find((p) => p.id === selectedPsuId) || null;
@@ -325,7 +338,12 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
   async function addDevice(e: React.FormEvent) {
     e.preventDefault();
     if (!rack) return;
-    const ok = await operate({ action: "ADD_DEVICE", rackId: rack.id, ...draft });
+    const ok = await operate({
+      action: "ADD_DEVICE",
+      rackId: rack.id,
+      ...draft,
+      hostname,
+    });
     if (ok) {
       setShowAdd(false);
       setMessage(`Installed ${draft.name} at U${draft.startU}.`);
@@ -552,6 +570,17 @@ export function RackElevationStudio({ rackId }: { rackId: string }) {
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
+            />
+          </Field>
+          <Field label="Short Code" className="md:col-span-2">
+            <input
+              required
+              value={hostname}
+              onChange={(e) => {
+                setHostnameTouched(true);
+                setHostname(e.target.value);
+              }}
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 font-mono text-white"
             />
           </Field>
           <Field label="Type">

@@ -197,6 +197,7 @@ export async function getFullInfrastructureSnapshot() {
                               select: {
                                 id: true,
                                 name: true,
+                                hostname: true,
                                 deviceType: true,
                                 startU: true,
                                 uHeight: true,

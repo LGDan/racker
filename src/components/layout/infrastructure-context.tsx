@@ -10,6 +10,7 @@ import React, {
   useState,
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { placedCode, suggestedCode } from "@/lib/suggested-code";
 
 export type AddEntity = "SITE" | "BUILDING" | "FLOOR" | "ROOM" | "ROW" | "RACK";
 
@@ -25,6 +26,7 @@ export interface TreeRack {
   devices?: {
     id: string;
     name: string;
+    hostname?: string | null;
     deviceType: string;
     startU: number;
     uHeight: number;
@@ -34,6 +36,7 @@ export interface TreeRack {
 export interface TreeRow {
   id: string;
   name: string;
+  code?: string | null;
   orientation: string;
   aisleContainment: string;
   gridX: number;
@@ -68,6 +71,7 @@ export interface TreeRoom {
 export interface TreeFloor {
   id: string;
   name: string;
+  code?: string | null;
   levelNumber: number;
   rooms: TreeRoom[];
 }
@@ -310,7 +314,11 @@ export function readEditDraft(sites: TreeSite[], type: AddEntity, id: string): E
       }
       for (const floor of building.floors) {
         if (type === "FLOOR" && floor.id === id) {
-          return { ...blankDraft(type, id, floor.name), levelNumber: String(floor.levelNumber) };
+          return {
+            ...blankDraft(type, id, floor.name),
+            code: floor.code || placedCode(sites, "FLOOR", floor.id, floor.name),
+            levelNumber: String(floor.levelNumber),
+          };
         }
         for (const room of floor.rooms) {
           if (type === "ROOM" && room.id === id) {
@@ -327,6 +335,7 @@ export function readEditDraft(sites: TreeSite[], type: AddEntity, id: string): E
             if (type === "ROW" && row.id === id) {
               return {
                 ...blankDraft(type, id, row.name),
+                code: row.code || placedCode(sites, "ROW", row.id),
                 orientation: row.orientation,
                 aisleContainment: row.aisleContainment,
               };
@@ -577,8 +586,15 @@ function HierarchyCreateDialog({
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
+  const { sites } = useInfrastructure();
   const [formName, setFormName] = useState("");
   const [formCode, setFormCode] = useState("");
+  const [codeTouched, setCodeTouched] = useState(false);
+  const suggested = useMemo(
+    () => suggestedCode(sites, type, parentId, formName),
+    [sites, type, parentId, formName]
+  );
+  const shortCode = codeTouched ? formCode : suggested;
   const [formNumber1, setFormNumber1] = useState(
     type === "SITE" ? "3000" : type === "ROOM" ? "150" : "42"
   );
@@ -594,7 +610,7 @@ function HierarchyCreateDialog({
     const payload: Record<string, unknown> = {
       entityType: type,
       name: formName,
-      code: formCode,
+      code: shortCode,
     };
     if (type === "SITE") {
       payload.utilityCapacityKw = Number(formNumber1);
@@ -682,24 +698,28 @@ function HierarchyCreateDialog({
             />
           </div>
 
-          {(type === "SITE" || type === "BUILDING" || type === "ROOM" || type === "RACK") && (
-            <div>
-              <label htmlFor="hierarchy-code" className="block text-slate-300 mb-1 font-medium">
-                Short Code
-              </label>
-              <input
-                id="hierarchy-code"
-                type="text"
-                required
-                value={formCode}
-                onChange={(event) => setFormCode(event.target.value)}
-                placeholder={
-                  type === "RACK" ? "R-A04" : type === "SITE" ? "FRA-DC3" : "CODE-01"
-                }
-                className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white font-mono"
-              />
-            </div>
-          )}
+          <div>
+            <label htmlFor="hierarchy-code" className="block text-slate-300 mb-1 font-medium">
+              Short Code
+            </label>
+            <input
+              id="hierarchy-code"
+              type="text"
+              required
+              value={shortCode}
+              onChange={(event) => {
+                setCodeTouched(true);
+                setFormCode(event.target.value);
+              }}
+              placeholder={type === "SITE" ? "npl-ted" : "npl-ted.f12"}
+              className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-700 text-white font-mono"
+            />
+            <p className="mt-1 text-[11px] text-slate-500">
+              {type === "SITE"
+                ? "Suggested from the name. You can change it."
+                : "Suggested from the parent. You can change it."}
+            </p>
+          </div>
 
           {type === "RACK" && (
             <div className="grid grid-cols-2 gap-3">
@@ -809,6 +829,7 @@ function HierarchyEditDialog({
     } else if (form.type === "BUILDING") {
       payload.code = form.code;
     } else if (form.type === "FLOOR") {
+      payload.code = form.code;
       payload.levelNumber = Number(form.levelNumber);
     } else if (form.type === "ROOM") {
       payload.code = form.code;
@@ -817,6 +838,7 @@ function HierarchyEditDialog({
       payload.coolingRedundancy = form.coolingRedundancy;
       payload.ambientTempTargetC = Number(form.ambientTempTargetC);
     } else if (form.type === "ROW") {
+      payload.code = form.code;
       payload.orientation = form.orientation;
       payload.aisleContainment = form.aisleContainment;
     } else if (form.type === "RACK") {
@@ -861,9 +883,7 @@ function HierarchyEditDialog({
         )}
         <form onSubmit={handleSave} className="space-y-3 text-xs">
           <Field label="Name" value={form.name} onChange={(value) => setField("name", value)} />
-          {(form.type === "SITE" || form.type === "BUILDING" || form.type === "ROOM" || form.type === "RACK") && (
-            <Field label="Short Code" value={form.code} onChange={(value) => setField("code", value)} mono />
-          )}
+          <Field label="Short Code" value={form.code} onChange={(value) => setField("code", value)} mono />
           {form.type === "SITE" && (
             <>
               <Field label="Address" value={form.address} onChange={(value) => setField("address", value)} />

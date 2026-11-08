@@ -46,10 +46,15 @@ export async function POST(req: NextRequest) {
     const { entityType } = body;
 
     if (entityType === "SITE") {
+      const code = requiredText(body.code, "Code");
+      const clash = await prisma.site.findFirst({
+        where: { code: { equals: code, mode: "insensitive" } },
+      });
+      if (clash) throw new FloorError("A site with that code already exists.");
       const created = await prisma.site.create({
         data: {
           name: body.name,
-          code: String(body.code).toUpperCase().trim(),
+          code,
           address: body.address || "Datacenter Campus",
           city: body.city || "London",
           country: body.country || "United Kingdom",
@@ -74,7 +79,7 @@ export async function POST(req: NextRequest) {
         data: {
           siteId: body.siteId,
           name: body.name,
-          code: String(body.code || "BLDG").toUpperCase(),
+          code: storedCode(body.code, "BLDG"),
         },
       });
       return NextResponse.json({ item: created });
@@ -85,6 +90,7 @@ export async function POST(req: NextRequest) {
         data: {
           buildingId: body.buildingId,
           name: body.name,
+          code: optionalCode(body.code),
           levelNumber: Number(body.levelNumber ?? 1),
         },
       });
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
         data: {
           floorId: body.floorId,
           name: body.name,
-          code: String(body.code || "DH-NEW").toUpperCase(),
+          code: storedCode(body.code, "DH-NEW"),
           roomType: body.roomType || "DATA_HALL",
           coolingCapacityKw: Number(body.coolingCapacityKw || 150),
           coolingRedundancy: body.coolingRedundancy || "N_PLUS_1",
@@ -113,6 +119,7 @@ export async function POST(req: NextRequest) {
         data: {
           roomId: body.roomId,
           name: body.name,
+          code: optionalCode(body.code),
           orientation: body.orientation || "HORIZONTAL",
           aisleContainment: body.aisleContainment || "COLD_AISLE",
           gridX: Number(body.gridX || 2),
@@ -127,7 +134,7 @@ export async function POST(req: NextRequest) {
         data: {
           rowId: body.rowId,
           name: body.name,
-          code: String(body.code || "R-NEW").toUpperCase(),
+          code: storedCode(body.code, "R-NEW"),
           totalU: Number(body.totalU || 42),
           maxPowerWatts: Number(body.maxPowerWatts || 12000),
           maxWeightKg: Number(body.maxWeightKg || 1200),
@@ -319,6 +326,16 @@ const REDUNDANCY = ["N", "N_PLUS_1", "TWO_N"];
 const ORIENTATIONS = ["HORIZONTAL", "VERTICAL"];
 const CONTAINMENT = ["NONE", "HOT_AISLE", "COLD_AISLE"];
 
+function storedCode(value: unknown, fallback: string) {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function optionalCode(value: unknown) {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
 function requiredText(value: unknown, label: string) {
   const text = String(value ?? "").trim();
   if (!text) throw new FloorError(`${label} is required`);
@@ -349,10 +366,12 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
   const name = requiredText(body.name, "Name");
 
   if (entityType === "UPDATE_SITE") {
-    const code = requiredText(body.code, "Code").toUpperCase();
+    const code = requiredText(body.code, "Code");
     const current = await prisma.site.findUnique({ where: { id } });
     if (!current) throw new FloorError("Site not found", 404);
-    const clash = await prisma.site.findFirst({ where: { code, NOT: { id } } });
+    const clash = await prisma.site.findFirst({
+      where: { code: { equals: code, mode: "insensitive" }, NOT: { id } },
+    });
     if (clash) throw new FloorError("A site with that code already exists.");
     const pueTarget = requiredNumber(body.pueTarget, "PUE target");
     if (pueTarget <= 0) throw new FloorError("PUE target must be greater than zero");
@@ -375,7 +394,7 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
     if (!current) throw new FloorError("Building not found", 404);
     return prisma.building.update({
       where: { id },
-      data: { name, code: requiredText(body.code, "Code").toUpperCase() },
+      data: { name, code: requiredText(body.code, "Code") },
     });
   }
 
@@ -384,7 +403,11 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
     if (!current) throw new FloorError("Floor not found", 404);
     return prisma.floor.update({
       where: { id },
-      data: { name, levelNumber: requiredInt(body.levelNumber, "Level number") },
+      data: {
+        name,
+        code: optionalCode(body.code),
+        levelNumber: requiredInt(body.levelNumber, "Level number"),
+      },
     });
   }
 
@@ -395,7 +418,7 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
       where: { id },
       data: {
         name,
-        code: requiredText(body.code, "Code").toUpperCase(),
+        code: requiredText(body.code, "Code"),
         roomType: oneOf(body.roomType, ROOM_TYPES, "Room type"),
         coolingCapacityKw: requiredNumber(body.coolingCapacityKw, "Cooling capacity"),
         coolingRedundancy: oneOf(body.coolingRedundancy, REDUNDANCY, "Redundancy"),
@@ -411,6 +434,7 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
       where: { id },
       data: {
         name,
+        code: optionalCode(body.code),
         orientation: oneOf(body.orientation, ORIENTATIONS, "Orientation"),
         aisleContainment: oneOf(body.aisleContainment, CONTAINMENT, "Aisle containment"),
       },
@@ -426,7 +450,7 @@ async function updateHierarchyEntity(entityType: string, body: Record<string, un
       where: { id },
       data: {
         name,
-        code: requiredText(body.code, "Code").toUpperCase(),
+        code: requiredText(body.code, "Code"),
         totalU,
         maxPowerWatts: requiredNumber(body.maxPowerWatts, "Max power"),
         maxWeightKg: requiredNumber(body.maxWeightKg, "Max weight"),
